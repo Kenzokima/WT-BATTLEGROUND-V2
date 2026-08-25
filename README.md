@@ -26,22 +26,16 @@ This is not a battle royale yet. There is no loot, zone, plane, knock/revive, ra
 
 ## Install
 
-1. Copy `resources/[wtbg]` into the FiveM server resources folder.
-2. Use OneSync (`onesync on` / Infinity).
+This folder is txAdmin / FXServer **server-data** (not the FXServer binaries).
+
+1. Point txAdmin at this folder, or run FXServer from this directory with `+exec server.cfg`.
+2. OneSync is already enabled in `server.cfg`.
 3. Do not start ESX, QBCore, or Qbox with this stack.
-4. Add the resources to `server.cfg` in this order:
+4. Resource start order lives in `resources.cfg`.
 
-```cfg
-ensure wtbg_core
-ensure wtbg_party
-ensure wtbg_match
-ensure wtbg_combat
-ensure wtbg_ui
-```
+`chat`, `sessionmanager`, `hardcap`, and `rconlog` come from the FXServer artifact. Spawnmanager stays started; `wtbg_core` disables auto-spawn.
 
-Default chat and spawnmanager can remain started. Auto-spawn is disabled by `wtbg_core` when spawnmanager is present.
-
-Restart the server after install or after copying an updated `[wtbg]` folder.
+Restart the server after changing `[wtbg]`.
 
 ## Config
 
@@ -171,7 +165,7 @@ Returned tables are copies. Gameplay state is not taken from the client.
 - No auto squad fill.
 - Party and match results are in-memory only.
 - Dev commands are not a public matchmaking UI.
-- Copy `[wtbg]` from this repo into the txAdmin resources folder after each pull. This repo does not include FXServer.
+- This repo does not include FXServer binaries. Use txAdmin or a local artifact build.
 
 ## Next milestone
 
