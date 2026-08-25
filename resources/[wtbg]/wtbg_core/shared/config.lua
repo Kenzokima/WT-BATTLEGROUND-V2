@@ -34,3 +34,9 @@ Config.ResultDuration = 8
 Config.DevAce = 'wtbg.dev'
 
 Config.PedModel = 'mp_m_freemode_01'
+
+Config.PartyMaxSize = 4
+Config.PartyInviteTimeout = 30
+Config.SquadSize = 4
+Config.FriendlyFire = false
+Config.MatchMode = 'SQUAD'

@@ -5,6 +5,14 @@ local nextMatchId = 1001
 local history = {}
 local busy = {}
 
+local function matchMode()
+    local mode = Config.MatchMode or 'SQUAD'
+    if mode == 'FFA' then
+        return 'FFA'
+    end
+    return 'SQUAD'
+end
+
 local function snapshot(match)
     if not match then
         return nil
@@ -22,18 +30,34 @@ local function snapshot(match)
         }
     end
 
+    local teams = {}
+    for id, team in pairs(match.teams) do
+        teams[id] = {
+            id = team.id,
+            alivePlayers = team.alivePlayers,
+            eliminated = team.eliminated,
+            kills = team.kills,
+            placement = team.placement,
+            playerCount = WTBG.Count(team.players)
+        }
+    end
+
     return {
         id = match.id,
         state = match.state,
+        mode = match.mode,
         bucket = match.bucket,
         host = match.host,
         alivePlayers = match.alivePlayers,
+        aliveTeams = match.aliveTeams,
         winner = match.winner,
         winnerName = match.winnerName,
+        winnerTeamId = match.winnerTeamId,
         createdAt = match.createdAt,
         playerCount = WTBG.Count(match.players),
         maxPlayers = Config.MaxPlayers,
-        players = players
+        players = players,
+        teams = teams
     }
 end
 
@@ -58,6 +82,26 @@ local function recountAlive(match)
     return n
 end
 
+local function recountAliveTeams(match)
+    local n = 0
+    for _, team in pairs(match.teams) do
+        local alive = 0
+        for src, _ in pairs(team.players) do
+            local member = match.players[src]
+            if member and member.alive then
+                alive = alive + 1
+            end
+        end
+        team.alivePlayers = alive
+        team.eliminated = alive <= 0
+        if not team.eliminated then
+            n = n + 1
+        end
+    end
+    match.aliveTeams = n
+    return n
+end
+
 local function pushHistory(entry)
     history[#history + 1] = entry
     if #history > 20 then
@@ -71,14 +115,47 @@ local function lobbyStatus(match)
         matchId = match.id,
         players = WTBG.Count(match.players),
         maxPlayers = Config.MaxPlayers,
-        state = match.state
+        state = match.state,
+        mode = match.mode
     }
+end
+
+local function squadList(match, member)
+    if not match or not member or match.mode ~= 'SQUAD' then
+        return nil
+    end
+
+    local team = match.teams[member.teamId]
+    if not team then
+        return nil
+    end
+
+    local list = {}
+    for src, _ in pairs(team.players) do
+        local mate = match.players[src]
+        if mate then
+            list[#list + 1] = {
+                source = src,
+                name = mate.name,
+                alive = mate.alive == true
+            }
+        end
+    end
+
+    table.sort(list, function(a, b)
+        return a.source < b.source
+    end)
+
+    return list
 end
 
 local function hudPayload(match, member)
     return {
         alive = match.alivePlayers,
-        kills = member and member.kills or 0
+        kills = member and member.kills or 0,
+        mode = match.mode,
+        teamId = member and member.teamId or nil,
+        squad = squadList(match, member)
     }
 end
 
@@ -122,10 +199,25 @@ local function isBusy(source)
     return busy[source] == true
 end
 
-local function addMember(match, source)
+local function createTeam(match)
+    local id = match.nextTeamId
+    match.nextTeamId = id + 1
+    local team = {
+        id = id,
+        players = {},
+        alivePlayers = 0,
+        eliminated = false,
+        kills = 0,
+        placement = nil
+    }
+    match.teams[id] = team
+    return team
+end
+
+local function addMember(match, source, teamId)
     local member = {
         source = source,
-        teamId = nil,
+        teamId = teamId,
         alive = true,
         kills = 0,
         placement = nil,
@@ -135,12 +227,36 @@ local function addMember(match, source)
     }
 
     match.players[source] = member
+    local team = match.teams[teamId]
+    if team then
+        team.players[source] = true
+    end
     recountAlive(match)
+    recountAliveTeams(match)
     return member
 end
 
+local function removeFromTeam(match, source, member)
+    if not member then
+        return
+    end
+
+    local team = match.teams[member.teamId]
+    if not team then
+        return
+    end
+
+    team.players[source] = nil
+    if WTBG.Count(team.players) == 0 then
+        match.teams[member.teamId] = nil
+    end
+    recountAliveTeams(match)
+end
+
 local function removeMember(match, source)
+    local member = match.players[source]
     match.players[source] = nil
+    removeFromTeam(match, source, member)
     recountAlive(match)
 end
 
@@ -161,31 +277,64 @@ local function returnPlayersToLobby(match)
     end)
 end
 
+local function shouldEnd(match)
+    return recountAliveTeams(match) <= 1
+end
+
 local function findWinner(match)
-    local winner = nil
-    for source, member in pairs(match.players) do
-        if member.alive then
-            winner = source
-            member.placement = 1
+    recountAliveTeams(match)
+    local winnerTeam = nil
+    for _, team in pairs(match.teams) do
+        if not team.eliminated then
+            winnerTeam = team
             break
         end
     end
 
-    match.winner = winner
-    match.winnerName = winner and match.players[winner].name or nil
-    return winner
+    match.winnerTeamId = winnerTeam and winnerTeam.id or nil
+    match.winner = nil
+    match.winnerName = nil
+
+    if winnerTeam then
+        winnerTeam.placement = 1
+        local names = {}
+        for src, _ in pairs(winnerTeam.players) do
+            local member = match.players[src]
+            if member then
+                member.placement = 1
+                if member.alive then
+                    match.winner = src
+                end
+                names[#names + 1] = member.name
+            end
+        end
+
+        if match.mode == 'SQUAD' then
+            match.winnerName = ('TEAM %s'):format(winnerTeam.id)
+        else
+            match.winnerName = winnerTeam and match.winner and match.players[match.winner].name or names[1]
+        end
+    end
+
+    return match.winnerTeamId
 end
 
 local function resultPayload(match, source)
     local member = match.players[source]
-    local isWinner = match.winner == source
+    local team = member and match.teams[member.teamId] or nil
+    local isWinner = member and match.winnerTeamId ~= nil and member.teamId == match.winnerTeamId
 
     return {
-        isWinner = isWinner,
+        isWinner = isWinner and true or false,
         winnerName = match.winnerName,
+        winnerTeamId = match.winnerTeamId,
+        mode = match.mode,
         kills = member and member.kills or 0,
-        placement = member and member.placement or WTBG.Count(match.players),
-        totalPlayers = WTBG.Count(match.players)
+        teamKills = team and team.kills or 0,
+        placement = (team and team.placement) or (member and member.placement) or WTBG.Count(match.teams),
+        totalPlayers = WTBG.Count(match.players),
+        totalTeams = WTBG.Count(match.teams),
+        teammates = squadList(match, member)
     }
 end
 
@@ -197,7 +346,7 @@ local function finishMatch(match)
     match.state = WTBG.MatchStates.FINISHED
     findWinner(match)
 
-    foreachMember(match, function(source, member)
+    foreachMember(match, function(source)
         exports.wtbg_core:SetSessionState(source, WTBG.PlayerStates.RESULT)
         TriggerClientEvent('wtbg:match:finished', source)
         TriggerClientEvent('wtbg:ui:showResult', source, resultPayload(match, source))
@@ -207,6 +356,7 @@ local function finishMatch(match)
         id = match.id,
         winner = match.winner,
         winnerName = match.winnerName,
+        winnerTeamId = match.winnerTeamId,
         endedAt = os.time(),
         playerCount = WTBG.Count(match.players)
     })
@@ -228,6 +378,32 @@ local function finishMatch(match)
     return true
 end
 
+local function markEliminated(match, source)
+    local member = match.players[source]
+    if not member or not member.alive then
+        return false
+    end
+
+    member.alive = false
+    exports.wtbg_core:SetAlive(source, false)
+    exports.wtbg_core:SetSessionState(source, WTBG.PlayerStates.DEAD)
+
+    recountAlive(match)
+    recountAliveTeams(match)
+
+    local team = match.teams[member.teamId]
+    if team then
+        if team.eliminated and not team.placement then
+            team.placement = match.aliveTeams + 1
+        end
+        member.placement = team.placement or (match.alivePlayers + 1)
+    else
+        member.placement = match.alivePlayers + 1
+    end
+
+    return true
+end
+
 local function preparePlayer(match, source, member)
     local spawn, spawnIndex = pickSpawn(match)
     member.spawnIndex = spawnIndex
@@ -240,6 +416,7 @@ local function preparePlayer(match, source, member)
     exports.wtbg_core:SetSessionState(source, WTBG.PlayerStates.MATCH)
 
     TriggerClientEvent('wtbg:match:enter', source, spawn, Config.StartCountdown)
+    TriggerClientEvent('wtbg:match:setTeam', source, member.teamId, Config.FriendlyFire and true or false)
     TriggerClientEvent('wtbg:ui:showMatch', source, hudPayload(match, member))
 end
 
@@ -248,11 +425,89 @@ local function abortStart(match)
     match.state = WTBG.MatchStates.WAITING
 
     foreachMember(match, function(source)
-        exports.wtbg_core:Notify(source, 'Match start cancelled. Not enough players.')
+        exports.wtbg_core:Notify(source, 'Match start cancelled. Not enough teams.')
         exports.wtbg_core:SendToLobby(source)
     end)
 
     destroyMatch(matchId)
+end
+
+local function resolveJoiners(source)
+    if GetResourceState('wtbg_party') ~= 'started' then
+        return { source }
+    end
+
+    local party = exports.wtbg_party:GetPlayerParty(source)
+    if not party then
+        return { source }
+    end
+
+    if party.leader ~= source then
+        return nil, 'not_party_leader'
+    end
+
+    local list = {}
+    for i = 1, #party.members do
+        list[i] = party.members[i].source
+    end
+    return list
+end
+
+local function validateJoiners(match, joiners)
+    if #joiners < 1 then
+        return false, 'invalid'
+    end
+
+    if WTBG.Count(match.players) + #joiners > Config.MaxPlayers then
+        return false, 'full'
+    end
+
+    for i = 1, #joiners do
+        local src = joiners[i]
+        if isBusy(src) then
+            return false, 'busy'
+        end
+
+        if not GetPlayerName(src) then
+            return false, 'party_member_offline'
+        end
+
+        local state = exports.wtbg_core:GetPlayerState(src)
+        if not state then
+            return false, 'no_session'
+        end
+
+        if state.matchId then
+            return false, 'already_in_match'
+        end
+
+        if state.state ~= WTBG.PlayerStates.LOBBY then
+            return false, 'not_in_lobby'
+        end
+
+        if match.players[src] then
+            return false, 'already_joined'
+        end
+    end
+
+    return true, nil
+end
+
+local function addJoiners(match, joiners)
+    if match.mode == 'SQUAD' then
+        local team = createTeam(match)
+        for i = 1, #joiners do
+            addMember(match, joiners[i], team.id)
+            exports.wtbg_core:SetMatch(joiners[i], match.id, team.id)
+        end
+        return
+    end
+
+    for i = 1, #joiners do
+        local team = createTeam(match)
+        addMember(match, joiners[i], team.id)
+        exports.wtbg_core:SetMatch(joiners[i], match.id, team.id)
+    end
 end
 
 function WTBG.Match.Get(matchId)
@@ -265,8 +520,9 @@ function WTBG.Match.Create(source)
         return nil, 'invalid_source'
     end
 
-    if isBusy(source) then
-        return nil, 'busy'
+    local joiners, err = resolveJoiners(source)
+    if not joiners then
+        return nil, err
     end
 
     local player = exports.wtbg_core:GetPlayerState(source)
@@ -282,33 +538,46 @@ function WTBG.Match.Create(source)
         return nil, 'not_in_lobby'
     end
 
-    setBusy(source, true)
-
     local id = nextMatchId
     nextMatchId = nextMatchId + 1
 
     local match = {
         id = id,
         state = WTBG.MatchStates.WAITING,
+        mode = matchMode(),
         bucket = id,
         host = source,
         players = {},
         teams = {},
         alivePlayers = 0,
+        aliveTeams = 0,
+        nextTeamId = 1,
         winner = nil,
         winnerName = nil,
+        winnerTeamId = nil,
         createdAt = os.time(),
         nextSpawn = 0
     }
 
+    local ok, joinErr = validateJoiners(match, joiners)
+    if not ok then
+        return nil, joinErr
+    end
+
+    for i = 1, #joiners do
+        setBusy(joiners[i], true)
+    end
+
     SetRoutingBucketPopulationEnabled(match.bucket, false)
     matches[id] = match
-    addMember(match, source)
-    exports.wtbg_core:SetMatch(source, id, nil)
+    addJoiners(match, joiners)
     updateLobbyUi(match)
 
-    setBusy(source, false)
-    WTBG.Debug('created match', id, 'host', source)
+    for i = 1, #joiners do
+        setBusy(joiners[i], false)
+    end
+
+    WTBG.Debug('created match', id, 'host', source, 'mode', match.mode)
     return id, nil
 end
 
@@ -319,24 +588,9 @@ function WTBG.Match.Join(source, matchId)
         return false, 'invalid'
     end
 
-    if isBusy(source) then
-        return false, 'busy'
-    end
-
-    local player = exports.wtbg_core:GetPlayerState(source)
-    if not player then
-        return false, 'no_session'
-    end
-
-    if player.matchId then
-        if player.matchId == matchId then
-            return false, 'already_joined'
-        end
-        return false, 'already_in_match'
-    end
-
-    if player.state ~= WTBG.PlayerStates.LOBBY then
-        return false, 'not_in_lobby'
+    local joiners, err = resolveJoiners(source)
+    if not joiners then
+        return false, err
     end
 
     local match = getMatch(matchId)
@@ -348,21 +602,23 @@ function WTBG.Match.Join(source, matchId)
         return false, 'not_joinable'
     end
 
-    if WTBG.Count(match.players) >= Config.MaxPlayers then
-        return false, 'full'
+    local ok, joinErr = validateJoiners(match, joiners)
+    if not ok then
+        return false, joinErr
     end
 
-    if match.players[source] then
-        return false, 'already_joined'
+    for i = 1, #joiners do
+        setBusy(joiners[i], true)
     end
 
-    setBusy(source, true)
-    addMember(match, source)
-    exports.wtbg_core:SetMatch(source, match.id, nil)
+    addJoiners(match, joiners)
     updateLobbyUi(match)
-    setBusy(source, false)
 
-    WTBG.Debug('joined match', match.id, source)
+    for i = 1, #joiners do
+        setBusy(joiners[i], false)
+    end
+
+    WTBG.Debug('joined match', match.id, source, 'group', #joiners)
     return true, nil
 end
 
@@ -373,13 +629,9 @@ local function leaveActive(match, source)
     end
 
     if member.alive then
-        member.alive = false
-        member.placement = recountAlive(match) + 1
-        exports.wtbg_core:SetAlive(source, false)
-        exports.wtbg_core:SetSessionState(source, WTBG.PlayerStates.DEAD)
+        markEliminated(match, source)
         updateHud(match)
-
-        if match.alivePlayers <= 1 then
+        if shouldEnd(match) then
             finishMatch(match)
         end
     end
@@ -423,8 +675,7 @@ function WTBG.Match.Leave(source)
     end
 
     if match.host == source then
-        local newHost = next(match.players)
-        match.host = newHost
+        match.host = next(match.players)
     end
 
     updateLobbyUi(match)
@@ -461,9 +712,15 @@ function WTBG.Match.Start(source, matchId)
         return false, 'not_enough_players'
     end
 
+    recountAliveTeams(match)
+    if match.aliveTeams < 2 then
+        return false, 'not_enough_teams'
+    end
+
     match.state = WTBG.MatchStates.STARTING
     match.nextSpawn = 0
     recountAlive(match)
+    recountAliveTeams(match)
 
     foreachMember(match, function(src, member)
         preparePlayer(match, src, member)
@@ -476,7 +733,8 @@ function WTBG.Match.Start(source, matchId)
             return
         end
 
-        if WTBG.Count(current.players) < Config.MinPlayers then
+        recountAliveTeams(current)
+        if WTBG.Count(current.players) < Config.MinPlayers or current.aliveTeams < 2 then
             abortStart(current)
             return
         end
@@ -484,12 +742,14 @@ function WTBG.Match.Start(source, matchId)
         current.state = WTBG.MatchStates.ACTIVE
         current.startedAt = os.time()
         recountAlive(current)
+        recountAliveTeams(current)
 
         foreachMember(current, function(src, member)
             pcall(function()
                 TriggerEvent('wtbg:match:applyLoadout', src)
             end)
             TriggerClientEvent('wtbg:match:begin', src)
+            TriggerClientEvent('wtbg:match:setTeam', src, member.teamId, Config.FriendlyFire and true or false)
             TriggerClientEvent('wtbg:ui:hud', src, hudPayload(current, member))
         end)
 
@@ -527,20 +787,28 @@ function WTBG.Match.ReportDeath(victim, killer, weapon)
         return false, nil
     end
 
-    member.alive = false
-    exports.wtbg_core:SetAlive(victim, false)
-    exports.wtbg_core:SetSessionState(victim, WTBG.PlayerStates.DEAD)
-
-    local alive = recountAlive(match)
-    member.placement = alive + 1
-
     local killerMember = killer and match.players[killer] or nil
     if killer and killer ~= victim and killerMember then
-        killerMember.kills = (killerMember.kills or 0) + 1
+        local sameTeam = member.teamId ~= nil and member.teamId == killerMember.teamId
+        if sameTeam and not Config.FriendlyFire then
+            killer = nil
+            killerMember = nil
+        elseif sameTeam then
+            killer = nil
+            killerMember = nil
+        else
+            killerMember.kills = (killerMember.kills or 0) + 1
+            local team = match.teams[killerMember.teamId]
+            if team then
+                team.kills = (team.kills or 0) + 1
+            end
+        end
     else
         killer = nil
         killerMember = nil
     end
+
+    markEliminated(match, victim)
 
     local info = {
         matchId = match.id,
@@ -550,6 +818,7 @@ function WTBG.Match.ReportDeath(victim, killer, weapon)
         killerName = killerMember and killerMember.name or nil,
         weapon = weapon,
         alivePlayers = match.alivePlayers,
+        aliveTeams = match.aliveTeams,
         ended = false
     }
 
@@ -561,7 +830,7 @@ function WTBG.Match.ReportDeath(victim, killer, weapon)
 
     TriggerClientEvent('wtbg:match:playerDied', victim)
 
-    if match.alivePlayers <= 1 then
+    if shouldEnd(match) then
         info.ended = true
         finishMatch(match)
         info.winner = match.winner
@@ -594,15 +863,13 @@ function WTBG.Match.HandleDisconnect(source, state)
 
     if match.state == WTBG.MatchStates.ACTIVE then
         if member.alive then
-            member.alive = false
-            recountAlive(match)
-            member.placement = match.alivePlayers + 1
+            markEliminated(match, source)
             updateHud(match)
         end
 
         removeMember(match, source)
 
-        if match.alivePlayers <= 1 then
+        if shouldEnd(match) then
             finishMatch(match)
         end
 
@@ -614,7 +881,8 @@ function WTBG.Match.HandleDisconnect(source, state)
 
     removeMember(match, source)
 
-    if match.state == WTBG.MatchStates.STARTING and WTBG.Count(match.players) < Config.MinPlayers then
+    recountAliveTeams(match)
+    if match.state == WTBG.MatchStates.STARTING and (WTBG.Count(match.players) < Config.MinPlayers or match.aliveTeams < 2) then
         abortStart(match)
         return
     end
@@ -639,9 +907,11 @@ function WTBG.Match.List()
         list[#list + 1] = {
             id = id,
             state = match.state,
+            mode = match.mode,
             players = WTBG.Count(match.players),
             maxPlayers = Config.MaxPlayers,
-            alive = match.alivePlayers
+            alive = match.alivePlayers,
+            aliveTeams = match.aliveTeams
         }
     end
 

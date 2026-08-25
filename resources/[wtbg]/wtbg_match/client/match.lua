@@ -1,6 +1,8 @@
 local frozen = false
 local inMatch = false
 local isDead = false
+local myTeamId = nil
+local allowFriendlyFire = false
 
 local function stripWeapons(ped)
     RemoveAllPedWeapons(ped, true)
@@ -9,6 +11,26 @@ end
 
 local function unlockCombat()
     exports.wtbg_core:UnlockCombat()
+end
+
+local function applyTeamRelations()
+    local ped = PlayerPedId()
+    if not DoesEntityExist(ped) then
+        return
+    end
+
+    NetworkSetFriendlyFireOption(true)
+    SetCanAttackFriendly(ped, allowFriendlyFire and true or false, false)
+
+    if not myTeamId then
+        return
+    end
+
+    local name = ('WTBG_TEAM_%s'):format(myTeamId)
+    local hash = joaat(name)
+    AddRelationshipGroup(name)
+    SetPedRelationshipGroupHash(ped, hash)
+    SetRelationshipBetweenGroups(0, hash, hash)
 end
 
 local function setFrozen(value)
@@ -20,6 +42,7 @@ local function setFrozen(value)
 
     if not frozen then
         unlockCombat()
+        applyTeamRelations()
     end
 end
 
@@ -50,8 +73,14 @@ local function teleport(coords)
     SetEntityHealth(ped, health)
     SetPedArmour(ped, 0)
     stripWeapons(ped)
-    exports.wtbg_core:EnableFriendlyFire()
+    applyTeamRelations()
 end
+
+RegisterNetEvent('wtbg:match:setTeam', function(teamId, friendlyFire)
+    myTeamId = tonumber(teamId)
+    allowFriendlyFire = friendlyFire and true or false
+    applyTeamRelations()
+end)
 
 RegisterNetEvent('wtbg:match:enter', function(coords, countdown)
     if type(coords) ~= 'table' then
@@ -79,6 +108,7 @@ RegisterNetEvent('wtbg:match:begin', function()
     isDead = false
     setFrozen(false)
     unlockCombat()
+    applyTeamRelations()
 end)
 
 RegisterNetEvent('wtbg:match:playerDied', function()
@@ -89,12 +119,14 @@ end)
 RegisterNetEvent('wtbg:match:finished', function()
     isDead = false
     inMatch = false
+    myTeamId = nil
     setFrozen(true)
 end)
 
 RegisterNetEvent('wtbg:core:spawnLobby', function()
     inMatch = false
     isDead = false
+    myTeamId = nil
     setFrozen(false)
     unlockCombat()
 end)
@@ -112,7 +144,7 @@ CreateThread(function()
             Wait(400)
         else
             if inMatch and not isDead then
-                exports.wtbg_core:EnableFriendlyFire()
+                applyTeamRelations()
             end
             Wait(800)
         end

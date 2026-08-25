@@ -1,14 +1,26 @@
 local menuOpen = false
+local inviteOpen = false
 local screen = 'hidden'
+local invitePartyId = nil
 
 local function nui(payload)
     SendNUIMessage(payload)
 end
 
+local function applyFocus()
+    local focused = menuOpen or inviteOpen
+    SetNuiFocus(focused, focused)
+    nui({ action = 'menu', open = menuOpen })
+end
+
 local function setFocus(value)
     menuOpen = value and true or false
-    SetNuiFocus(menuOpen, menuOpen)
-    nui({ action = 'menu', open = menuOpen })
+    applyFocus()
+end
+
+local function setInviteFocus(value)
+    inviteOpen = value and true or false
+    applyFocus()
 end
 
 RegisterNetEvent('wtbg:ui:showLobby', function(data)
@@ -25,11 +37,14 @@ end)
 
 RegisterNetEvent('wtbg:ui:showMatch', function(data)
     screen = 'match'
+    setInviteFocus(false)
     setFocus(false)
     nui({
         action = 'showMatch',
         alive = data and data.alive or 0,
-        kills = data and data.kills or 0
+        kills = data and data.kills or 0,
+        mode = data and data.mode or nil,
+        squad = data and data.squad or nil
     })
 end)
 
@@ -37,7 +52,9 @@ RegisterNetEvent('wtbg:ui:hud', function(data)
     nui({
         action = 'hud',
         alive = data and data.alive or 0,
-        kills = data and data.kills or 0
+        kills = data and data.kills or 0,
+        mode = data and data.mode or nil,
+        squad = data and data.squad or nil
     })
 end)
 
@@ -51,14 +68,42 @@ end)
 
 RegisterNetEvent('wtbg:ui:showResult', function(data)
     screen = 'result'
+    setInviteFocus(false)
     setFocus(false)
     nui({
         action = 'showResult',
         isWinner = data and data.isWinner or false,
         winnerName = data and data.winnerName or nil,
+        mode = data and data.mode or nil,
         kills = data and data.kills or 0,
+        teamKills = data and data.teamKills or 0,
         placement = data and data.placement or 0,
-        totalPlayers = data and data.totalPlayers or 0
+        totalPlayers = data and data.totalPlayers or 0,
+        totalTeams = data and data.totalTeams or 0,
+        teammates = data and data.teammates or nil
+    })
+end)
+
+RegisterNetEvent('wtbg:ui:party', function(data)
+    nui({
+        action = 'party',
+        party = data
+    })
+end)
+
+RegisterNetEvent('wtbg:ui:partyInvite', function(data)
+    if type(data) ~= 'table' then
+        invitePartyId = nil
+        setInviteFocus(false)
+        nui({ action = 'partyInvite', invite = nil })
+        return
+    end
+
+    invitePartyId = data.partyId
+    setInviteFocus(true)
+    nui({
+        action = 'partyInvite',
+        invite = data
     })
 end)
 
@@ -107,11 +152,28 @@ RegisterNUICallback('leaveMatch', function(_, cb)
     cb({ ok = true })
 end)
 
+RegisterNUICallback('acceptInvite', function(data, cb)
+    local partyId = (data and data.partyId) or invitePartyId
+    TriggerServerEvent('wtbg:party:accept', partyId)
+    invitePartyId = nil
+    setInviteFocus(false)
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('declineInvite', function(data, cb)
+    local partyId = (data and data.partyId) or invitePartyId
+    TriggerServerEvent('wtbg:party:decline', partyId)
+    invitePartyId = nil
+    setInviteFocus(false)
+    cb({ ok = true })
+end)
+
 AddEventHandler('onClientResourceStart', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then
         return
     end
 
+    setInviteFocus(false)
     setFocus(false)
     nui({ action = 'hide' })
 end)
