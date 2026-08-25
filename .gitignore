@@ -1,0 +1,9 @@
+cache/
+.fxap
+*.log
+.replxx_history
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
