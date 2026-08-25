@@ -106,8 +106,17 @@ end)
 RegisterNetEvent('wtbg:match:begin', function()
     inMatch = true
     isDead = false
-    setFrozen(false)
-    unlockCombat()
+    local airborne = false
+    if GetResourceState('wtbg_drop') == 'started' then
+        local ok, landed = pcall(function()
+            return exports.wtbg_drop:IsLanded()
+        end)
+        airborne = ok and landed == false
+    end
+    if not airborne then
+        setFrozen(false)
+        unlockCombat()
+    end
     applyTeamRelations()
 end)
 

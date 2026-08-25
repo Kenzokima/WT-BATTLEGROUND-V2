@@ -28,6 +28,8 @@ Config.Loadout = {
     { weapon = 'WEAPON_PISTOL', ammo = 120 }
 }
 
+Config.UseBRStartingLoadout = true
+
 Config.StartCountdown = 5
 Config.ResultDuration = 8
 
@@ -40,3 +42,10 @@ Config.PartyInviteTimeout = 30
 Config.SquadSize = 4
 Config.FriendlyFire = false
 Config.MatchMode = 'SQUAD'
+
+Config.BleedoutTime = 25
+Config.ReviveTime = 6
+Config.FinishTime = 2
+Config.ReviveRange = 4.0
+Config.FinishRange = 3.5
+Config.ReviveHealth = 140

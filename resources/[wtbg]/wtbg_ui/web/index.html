@@ -46,18 +46,119 @@
         </section>
 
         <section id="hud" class="screen hidden">
-            <div class="alive">
-                <span>ALIVE</span>
-                <strong id="hud-alive">0</strong>
-            </div>
-            <div class="kills">
-                <span>KILLS</span>
-                <strong id="hud-kills">0</strong>
-            </div>
             <aside id="squad-panel" class="squad-panel hidden">
                 <p class="party-title">SQUAD</p>
                 <ul id="squad-slots"></ul>
             </aside>
+            <div id="match-info" class="match-info">
+                <div class="match-counts">
+                    <div class="alive">
+                        <strong id="hud-alive">0</strong>
+                        <span>ALIVE</span>
+                    </div>
+                    <div class="kills">
+                        <strong id="hud-kills">0</strong>
+                        <span>KILLS</span>
+                    </div>
+                </div>
+                <div id="zone" class="zone-hud hidden">
+                    <span id="zone-phase">ZONE 1</span>
+                    <div class="zone-row">
+                        <p id="zone-state">SHRINKS IN</p>
+                        <strong id="zone-time">00:00</strong>
+                    </div>
+                </div>
+            </div>
+            <div id="downed" class="downed hidden">
+                <span>DOWN</span>
+                <p>BLEEDING OUT</p>
+                <strong id="bleed-time">00:00</strong>
+            </div>
+            <div id="prompt" class="prompt hidden">
+                <p id="prompt-text"></p>
+                <div class="prompt-track"><i id="prompt-bar"></i></div>
+            </div>
+            <div id="heal" class="heal hidden">
+                <p id="heal-text">USING</p>
+                <strong id="heal-time">0.0s</strong>
+                <div class="prompt-track"><i id="heal-bar"></i></div>
+            </div>
+            <div id="context" class="context hidden">
+                <em id="context-key">E</em>
+                <div>
+                    <p id="context-action">PICK UP</p>
+                    <span id="context-detail"></span>
+                </div>
+            </div>
+            <div id="zone-warn" class="zone-warn hidden">RETURN TO SAFE ZONE</div>
+            <div id="drop" class="drop-hud hidden">
+                <span id="drop-phase">PLANE</span>
+                <p id="drop-line"></p>
+            </div>
+            <div id="hud-keys" class="hud-keys"></div>
+        </section>
+
+        <section id="inventory" class="inv-shell hidden">
+            <div class="inv-overlay"></div>
+            <div class="inv-layout">
+                <article class="inv-col" id="col-vicinity">
+                    <p class="inv-title">VICINITY</p>
+                    <p id="vicinity-sub" class="inv-sub hidden"></p>
+                    <ul id="inv-vicinity" class="inv-cards"></ul>
+                </article>
+                <article class="inv-col" id="col-inventory">
+                    <p class="inv-title">INVENTORY</p>
+                    <p class="inv-kicker">AMMO</p>
+                    <ul id="inv-ammo" class="inv-cards"></ul>
+                    <p class="inv-kicker">MEDICAL</p>
+                    <ul id="inv-heal" class="inv-cards"></ul>
+                    <p class="inv-kicker">THROWABLE</p>
+                    <ul id="inv-throw" class="inv-cards"></ul>
+                </article>
+                <article class="inv-col" id="col-equipment">
+                    <p class="inv-title">EQUIPMENT</p>
+                    <div id="eq-primary" class="eq-slot" data-kind="weapon" data-key="primary">
+                        <em>1</em>
+                        <div>
+                            <span>PRIMARY</span>
+                            <strong id="inv-primary">Empty</strong>
+                            <p id="eq-primary-ammo" class="eq-ammo"></p>
+                        </div>
+                        <button type="button" class="eq-drop" data-kind="weapon" data-key="primary">Drop</button>
+                    </div>
+                    <div id="eq-secondary" class="eq-slot" data-kind="weapon" data-key="secondary">
+                        <em>2</em>
+                        <div>
+                            <span>SECONDARY</span>
+                            <strong id="inv-secondary">Empty</strong>
+                            <p id="eq-secondary-ammo" class="eq-ammo"></p>
+                        </div>
+                        <button type="button" class="eq-drop" data-kind="weapon" data-key="secondary">Drop</button>
+                    </div>
+                    <div id="eq-sidearm" class="eq-slot" data-kind="weapon" data-key="sidearm">
+                        <em>3</em>
+                        <div>
+                            <span>SIDEARM</span>
+                            <strong id="inv-sidearm">Empty</strong>
+                            <p id="eq-sidearm-ammo" class="eq-ammo"></p>
+                        </div>
+                        <button type="button" class="eq-drop" data-kind="weapon" data-key="sidearm">Drop</button>
+                    </div>
+                    <div class="eq-armor">
+                        <span>ARMOR</span>
+                        <strong id="inv-armor">0 / 100</strong>
+                    </div>
+                    <div class="inv-guide">
+                        <p class="inv-title">GUIDE</p>
+                        <ul>
+                            <li><em>F2 / TAB</em> CLOSE</li>
+                            <li><em>Click</em> ACTION</li>
+                            <li><em>Right Click</em> ACTION</li>
+                            <li><em>1 / 2 / 3</em> WEAPON</li>
+                        </ul>
+                    </div>
+                </article>
+            </div>
         </section>
 
         <section id="killfeed"></section>

@@ -2,9 +2,9 @@
 
 Prototype standalone **battleground / last-team-standing** untuk **FiveM (GTA5)**.
 
-Milestone saat ini: **M2 - Party / Squad**.
+Milestone saat ini: **M4A — Plane / Drop / Parachute**.
 
-Pemain mulai di lobby, opsional membentuk party, membuat atau bergabung ke match, lalu bertarung di routing bucket terpisah sampai tersisa satu tim hidup.
+Pemain mulai di lobby, opsional membentuk party, membuat atau bergabung ke match, lalu bertarung di routing bucket terpisah sampai tersisa satu tim hidup. Match memakai knock/revive, loot BR, zone, dan HUD kompetitif.
 
 | | |
 |---|---|
@@ -53,7 +53,7 @@ Mode permainan saat ini:
 - Death → eliminate → last alive team menang
 - Layar result singkat, lalu kembali ke lobby (party tetap ada)
 
-Ini belum battle royale: belum ada loot, zone, plane, knock/revive, ranked, cosmetics, clans, atau framework dependency (ESX/QBCore/Qbox).
+Mode permainan saat ini mencakup lobby, party, match bucket, combat DOWN/revive/finish, loot BR, zone, dan HUD/inventory M3D. Belum ada plane, kendaraan, spectator, ranked, cosmetics, atau framework (ESX/QBCore/Qbox).
 
 ---
 
@@ -155,21 +155,15 @@ Di mode `SQUAD`, leader party membawa seluruh party saat create/join (atomic). D
 
 ### 4. `wtbg_combat` — Combat & Loadout
 
-**Peran:** memberi senjata sesuai `Config.Loadout`, mendeteksi kematian, melaporkan ke match manager.
+**Peran:** loadout, knock / bleedout / finish / revive, lalu eliminate ke match manager.
 
 | Path | Fungsi |
 |------|--------|
 | `shared/weapons.lua` | `Weapons.ApplyLoadout(ped)` |
-| `server/combat.lua` | Apply loadout + handle death report + lock |
-| `client/combat.lua` | Deteksi death (game event, baseevents, poll) |
+| `server/combat.lua` | Loadout, knock, revive, finish, bleedout |
+| `client/combat.lua` | Deteksi down, pose knock, hold E |
 
-Death detection multi-path agar tidak miss:
-
-- `CEventNetworkEntityDamage`
-- `baseevents:onPlayerKilled` / `onPlayerDied`
-- Polling `IsEntityDead` / `IsPedDeadOrDying` setiap 200ms
-
-Server memakai `deathLock` agar satu kematian tidak dilaporkan berulang. Kill same-team tidak mendapat credit jika friendly fire off.
+Knock terjadi di match `ACTIVE`. Player downed masih `alive` (tim belum tereliminasi). Kill credit hanya saat finish atau bleedout. Revive hanya sesama tim di mode `SQUAD`.
 
 ---
 
@@ -292,6 +286,12 @@ File: `resources/[wtbg]/wtbg_core/shared/config.lua`
 | `Config.SquadSize` | `4` | Ukuran squad |
 | `Config.FriendlyFire` | `false` | FF antar tim-mate |
 | `Config.MatchMode` | `'SQUAD'` | `'SQUAD'` atau `'FFA'` |
+| `Config.BleedoutTime` | `25` | Detik knock sebelum eliminate |
+| `Config.ReviveTime` | `6` | Detik hold E revive |
+| `Config.FinishTime` | `2` | Detik hold E finish |
+| `Config.ReviveRange` | `2.75` | Jarak revive (meter) |
+| `Config.FinishRange` | `2.5` | Jarak finish (meter) |
+| `Config.ReviveHealth` | `140` | HP setelah revive |
 
 - **`SQUAD`**: party join sebagai satu tim. Solo dapat tim sendiri. Last alive team menang.
 - **`FFA`**: tiap pemain = tim sendiri. Last alive tetap lewat logika tim yang sama.
@@ -329,8 +329,21 @@ Ubah koordinat / loadout / angka di file ini — resource lain membaca config le
 
 | Key | Aksi |
 |-----|------|
-| **F6** | Buka/tutup menu Match Controls (hanya saat layar lobby) |
-| **Esc** | Tutup menu NUI |
+| **SPACE** | Plane: jump. Freefall: deploy parachute (GTA). |
+| **F2** / **TAB** | Inventory (after landing only) |
+| **E** | Ambil loot / buka loot bag (dekat objek) |
+| **Hold E** | Revive teammate DOWN, atau Finish musuh DOWN |
+| **1 / 2 / 3** | Weapon slot Primary / Secondary / Sidearm (loadout server) |
+| **F6** | Buka/tutup menu Match Controls (hanya layar lobby) |
+| **Esc** | Tutup inventory / menu NUI |
+
+Inventory memakai klik tombol **Pick Up / Use / Drop / Take**. Klik kanan pada kartu item menjalankan aksi pertama. Drag-and-drop tidak dipakai.
+
+**G** tidak di-bind untuk drop (bentrok grenade GTA). Drop lewat tombol inventory.
+
+Slot **4 / 5** (throwable / heal) tidak ditambah; grenade/smoke/heal tetap lewat inventory **Use** / GTA throw.
+
+> Binding lama **I** untuk inventory sudah dihapus.
 
 ### Menu NUI (F6)
 
@@ -552,19 +565,19 @@ CFX eksternal yang dipakai:
 
 ### Status proyek
 
-Ini **standalone prototype** (`0.1.0`) — milestone **M2 Party / Squad**:
+Ini **standalone prototype** (`0.1.0`) — milestone **M3A Knock / Revive**:
 
 - Belum ada matchmaking otomatis / queue publik
 - Command create/join/start masih **dev-gated**
 - Belum ada persistence (stats, inventory, DB)
-- Belum ada spectate camera, knock/revive, loot, zone, vehicles, plane
+- Belum ada spectate camera, loot, zone, vehicles, plane
 - Belum ada auto squad fill
 - Map spawn masih hardcode di area airfield
 - Party dan match results in-memory only
 
 ### Next milestone
 
-**M3 - Loot / Knock / Revive / Zone**
+**M3B - Loot / Zone**
 
 Lalu:
 
