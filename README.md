@@ -1,8 +1,10 @@
 # WhiteTiger Battleground V2 (WTBG)
 
-Prototype standalone **battleground / last-player-standing** untuk **FiveM (GTA5)**.
+Prototype standalone **battleground / last-team-standing** untuk **FiveM (GTA5)**.
 
-Pemain mulai di lobby, membuat atau bergabung ke match, lalu bertarung di routing bucket terpisah sampai tersisa satu pemain hidup.
+Milestone saat ini: **M2 - Party / Squad**.
+
+Pemain mulai di lobby, opsional membentuk party, membuat atau bergabung ke match, lalu bertarung di routing bucket terpisah sampai tersisa satu tim hidup.
 
 | | |
 |---|---|
@@ -24,11 +26,13 @@ Pemain mulai di lobby, membuat atau bergabung ke match, lalu bertarung di routin
 6. [State Machine](#state-machine)
 7. [Konfigurasi](#konfigurasi)
 8. [Perintah & Kontrol](#perintah--kontrol)
-9. [Events & Exports](#events--exports)
-10. [UI (NUI)](#ui-nui)
-11. [Setup Server](#setup-server)
-12. [Dependensi Antar Resource](#dependensi-antar-resource)
-13. [Catatan Pengembangan](#catatan-pengembangan)
+9. [Squad Rules](#squad-rules)
+10. [Events & Exports](#events--exports)
+11. [UI (NUI)](#ui-nui)
+12. [Setup Server](#setup-server)
+13. [Dependensi Antar Resource](#dependensi-antar-resource)
+14. [Testing](#testing)
+15. [Catatan Pengembangan](#catatan-pengembangan)
 
 ---
 
@@ -36,16 +40,20 @@ Pemain mulai di lobby, membuat atau bergabung ke match, lalu bertarung di routin
 
 Repo ini berisi:
 
-1. **`resources/[wtbg]/`** — logika utama WhiteTiger Battleground V2 (core, match, combat, UI).
+1. **`resources/[wtbg]/`** — logika utama WhiteTiger Battleground V2 (core, party, match, combat, UI).
 2. **Resource CFX default** — aset standar `cfx-server-data` (spawnmanager, mapmanager, baseevents, maps, contoh gameplay, dll.) sebagai fondasi server FiveM.
 
 Mode permainan saat ini:
 
 - Lobby bersama (routing bucket `0`)
+- Party / squad opsional (max 4), membership bertahan setelah match
 - Match terisolasi per instance (routing bucket = match ID)
+- Mode `SQUAD` (party = satu tim) atau `FFA` (setiap pemain = tim sendiri)
 - Loadout tetap (carbine + pistol)
-- Death → eliminate → last alive menang
-- Layar result singkat, lalu kembali ke lobby
+- Death → eliminate → last alive team menang
+- Layar result singkat, lalu kembali ke lobby (party tetap ada)
+
+Ini belum battle royale: belum ada loot, zone, plane, knock/revive, ranked, cosmetics, clans, atau framework dependency (ESX/QBCore/Qbox).
 
 ---
 
@@ -56,9 +64,10 @@ WT-BATTLEGROUND-V2/
 └── resources/
     ├── [wtbg]/                 # ★ Logika custom WTBG
     │   ├── wtbg_core/          # Session, lobby, player state, ped
+    │   ├── wtbg_party/         # Party membership & invites
     │   ├── wtbg_match/         # Match lifecycle & commands
     │   ├── wtbg_combat/        # Loadout, death reporting
-    │   └── wtbg_ui/            # NUI lobby / HUD / result
+    │   └── wtbg_ui/            # NUI lobby / party / HUD / result
     │
     ├── [gamemodes]/            # CFX: gametype & maps
     ├── [gameplay]/             # CFX: chat theme, playernames, examples
@@ -88,7 +97,7 @@ WT-BATTLEGROUND-V2/
 
 ```lua
 {
-  source, state, matchId, teamId, alive, name
+  source, state, matchId, teamId, partyId, alive, name
 }
 ```
 
@@ -96,7 +105,21 @@ WT-BATTLEGROUND-V2/
 
 ---
 
-### 2. `wtbg_match` — Match Manager
+### 2. `wtbg_party` — Party / Squad
+
+**Peran:** party server-authoritative, invite, kick, promote, leave.
+
+| Path | Fungsi |
+|------|--------|
+| `server/party_manager.lua` | Engine party lengkap |
+| `server/commands.lua` | Chat commands party |
+| `client/party.lua` | Client bridge party |
+
+Party membership **bertahan** setelah match cleanup. Match `teamId` di-clear; `partyId` tetap.
+
+---
+
+### 3. `wtbg_match` — Match Manager
 
 **Peran:** create / join / leave / start match, isolasi bucket, countdown, win condition, history.
 
@@ -125,9 +148,11 @@ WT-BATTLEGROUND-V2/
 
 **Match ID** mulai dari `1001` dan naik. **Routing bucket** = match ID (populasi NPC dimatikan).
 
+Di mode `SQUAD`, leader party membawa seluruh party saat create/join (atomic). Di mode `FFA`, tiap pemain adalah tim sendiri.
+
 ---
 
-### 3. `wtbg_combat` — Combat & Loadout
+### 4. `wtbg_combat` — Combat & Loadout
 
 **Peran:** memberi senjata sesuai `Config.Loadout`, mendeteksi kematian, melaporkan ke match manager.
 
@@ -143,13 +168,13 @@ Death detection multi-path agar tidak miss:
 - `baseevents:onPlayerKilled` / `onPlayerDied`
 - Polling `IsEntityDead` / `IsPedDeadOrDying` setiap 200ms
 
-Server memakai `deathLock` agar satu kematian tidak dilaporkan berulang.
+Server memakai `deathLock` agar satu kematian tidak dilaporkan berulang. Kill same-team tidak mendapat credit jika friendly fire off.
 
 ---
 
-### 4. `wtbg_ui` — Interface (NUI)
+### 5. `wtbg_ui` — Interface (NUI)
 
-**Peran:** overlay lobby, menu F6, HUD match, killfeed, result screen, toast notify.
+**Peran:** overlay lobby, menu F6, party panel, HUD match / squad, killfeed, result screen, toast notify.
 
 | Path | Fungsi |
 |------|--------|
@@ -178,7 +203,7 @@ Resource di luar `[wtbg]` adalah bagian dari paket default **Cfx.re / cfx-server
 | `[gameplay]/[examples]` | `money`, `money-fountain`, `ped-money-drops`, … | Contoh scripting CFX |
 | `[test]` | `example-loadscreen` | Contoh loading screen |
 
-Untuk WTBG, yang paling relevan: **`spawnmanager`** dan **`baseevents`**.
+Untuk WTBG, yang paling relevan: **`spawnmanager`** dan **`baseevents`**. Auto-spawn dinonaktifkan oleh `wtbg_core` jika spawnmanager ada.
 
 ---
 
@@ -193,9 +218,10 @@ wtbg:core:sessionReady
     ▼
 LOBBY (bucket 0, ped freemode, no weapons)
     │
-    ├─ creatematch / F6 → Create Match
-    ├─ joinmatch <id> / F6 → Join Match
-    └─ startmatch / F6 → Start (min players)
+    ├─ party invite / accept (opsional)
+    ├─ creatematch / F6 → Create Match (leader bawa party)
+    ├─ joinmatch <id> / F6 → Join Match (leader bawa party)
+    └─ startmatch / F6 → Start (min players + teams)
             │
             ▼
        STARTING
@@ -207,7 +233,7 @@ LOBBY (bucket 0, ped freemode, no weapons)
             │
             ├─ player mati → DEAD, placement dihitung
             ├─ leave / disconnect saat aktif → treat as death
-            └─ alivePlayers <= 1
+            └─ alive teams <= 1
                     │
                     ▼
                  FINISHED
@@ -215,10 +241,10 @@ LOBBY (bucket 0, ped freemode, no weapons)
                     │
                     ▼
                  CLEANUP
-               (semua kembali lobby, match dihapus)
+               (semua kembali lobby, match dihapus, party tetap)
 ```
 
-**Win condition:** tersisa ≤ 1 pemain `alive` di match `ACTIVE`.
+**Win condition:** tersisa ≤ 1 tim `alive` di match `ACTIVE`.
 
 ---
 
@@ -264,6 +290,14 @@ File: `resources/[wtbg]/wtbg_core/shared/config.lua`
 | `Config.ResultDuration` | `8` | Detik layar hasil sebelum cleanup |
 | `Config.DevAce` | `'wtbg.dev'` | ACE permission untuk command (jika `Debug=false`) |
 | `Config.PedModel` | `'mp_m_freemode_01'` | Model ped default |
+| `Config.PartyMaxSize` | `4` | Maks anggota party |
+| `Config.PartyInviteTimeout` | `30` | Detik timeout invite |
+| `Config.SquadSize` | `4` | Ukuran squad |
+| `Config.FriendlyFire` | `false` | FF antar tim-mate |
+| `Config.MatchMode` | `'SQUAD'` | `'SQUAD'` atau `'FFA'` |
+
+- **`SQUAD`**: party join sebagai satu tim. Solo dapat tim sendiri. Last alive team menang.
+- **`FFA`**: tiap pemain = tim sendiri. Last alive tetap lewat logika tim yang sama.
 
 Ubah koordinat / loadout / angka di file ini — resource lain membaca config lewat `@wtbg_core/shared/config.lua`.
 
@@ -271,16 +305,28 @@ Ubah koordinat / loadout / angka di file ini — resource lain membaca config le
 
 ## Perintah & Kontrol
 
-### In-game commands
+### Match commands
 
 | Command | Akses | Fungsi |
 |---------|-------|--------|
-| `/creatematch` | Dev (`Debug` atau ACE `wtbg.dev`) | Buat match baru, jadi host |
-| `/joinmatch <id>` | Dev | Gabung match (contoh `/joinmatch 1001`) |
-| `/startmatch [id]` | Dev | Mulai match (harus anggota + min players) |
-| `/leavematch` | Semua | Keluar match / kembali lobby |
+| `/creatematch` | Dev (`Debug` atau ACE `wtbg.dev`) | Buat match. Party leader membawa seluruh party |
+| `/joinmatch <id>` | Dev | Solo join sendiri. Party leader join seluruh party. Member tidak bisa join |
+| `/startmatch [id]` | Dev | Mulai match (min 2 players & 2 teams) |
+| `/leavematch` | Semua | Keluar match / kembali lobby. Saat ACTIVE = eliminasi |
 | `/matches` | Dev / console | List match aktif |
 | `/wtbgmenu` | Client | Toggle menu lobby (sama dengan F6) |
+
+### Party commands
+
+| Command | Akses | Fungsi |
+|---------|-------|--------|
+| `/partyinvite [serverId]` | In-game | Invite. Buat party jika belum punya |
+| `/partyaccept [partyId]` | In-game | Terima invite |
+| `/partydecline [partyId]` | In-game | Tolak invite |
+| `/partyleave` | In-game | Keluar party. Leader ditransfer jika perlu |
+| `/partykick [serverId]` | Leader | Kick member |
+| `/partypromote [serverId]` | Leader | Promote leader baru |
+| `/party` | In-game | Print party saat ini |
 
 ### Keybind
 
@@ -304,6 +350,17 @@ Contoh `server.cfg`:
 add_ace group.admin wtbg.dev allow
 add_principal identifier.fivem:XXXX group.admin
 ```
+
+---
+
+## Squad Rules
+
+- Max party size 4.
+- Hanya leader yang invite, kick, promote, dan create/join match untuk party.
+- Party join ke match bersifat **atomic** — jika satu member gagal, tidak ada yang join.
+- Mode `SQUAD`: seluruh party memakai `teamId` yang sama.
+- Friendly fire off by default. Kill same-team tidak dapat credit.
+- Party survive match cleanup. Match `teamId` di-clear; `partyId` tetap.
 
 ---
 
@@ -345,21 +402,41 @@ add_principal identifier.fivem:XXXX group.admin
 
 ### Exports
 
+Returned tables are copies. Gameplay state tidak diambil dari client.
+
 #### `wtbg_core`
 
 | Export | Deskripsi |
 |--------|-----------|
-| `GetPlayerState(source)` | Snapshot state pemain |
+| `GetPlayerState(source)` | Snapshot state (termasuk `matchId`, `teamId`, `partyId`) |
 | `GetPlayerMatch(source)` | Match ID |
+| `GetPlayerPartyId(source)` | Party ID |
 | `IsPlayerAlive(source)` | Status alive |
 | `SendToLobby(source)` | Kirim ke lobby |
 | `SetSessionState(source, state)` | Set state |
 | `SetMatch(source, matchId, teamId)` | Bind ke match |
 | `SetAlive(source, alive)` | Set alive flag |
+| `SetParty(source, partyId)` | Bind ke party |
 | `Notify(source, message)` | Notifikasi |
 | `EnsureFreemodePed` (client) | Pastikan model ped |
 | `UnlockCombat` (client) | Unfreeze + enable control |
 | `EnableFriendlyFire` (client) | Friendly fire on |
+
+#### `wtbg_party`
+
+| Export | Deskripsi |
+|--------|-----------|
+| `GetParty(partyId)` | Snapshot party |
+| `GetPlayerParty(source)` | Party pemain |
+| `IsLeader(source)` | Apakah leader |
+| `CreateParty(source)` | Buat party |
+| `InvitePlayer(source, target)` | Invite |
+| `AcceptInvite(source, partyId)` | Terima invite |
+| `DeclineInvite(source, partyId)` | Tolak invite |
+| `LeaveParty(source)` | Keluar party |
+| `KickMember(source, target)` | Kick |
+| `PromoteLeader(source, target)` | Promote |
+| `DisbandParty(source)` | Bubarkan party |
 
 #### `wtbg_match`
 
@@ -387,10 +464,11 @@ Layar:
 
 1. **Lobby** — branding *WHITE TIGER BATTLEGROUND V2*, status, hint command
 2. **Menu (F6)** — create / join / start / leave
-3. **Match HUD** — `ALIVE` count + `KILLS`
-4. **Killfeed** — max 5 item, auto-remove
-5. **Result** — winner / placement / kills
-6. **Toasts** — notifikasi singkat
+3. **Party panel** — anggota / invite status
+4. **Match HUD** — `ALIVE` count + `KILLS` (+ squad info)
+5. **Killfeed** — max 5 item, auto-remove
+6. **Result** — winner team / placement / kills
+7. **Toasts** — notifikasi singkat
 
 NUI callbacks: `closeMenu`, `createMatch`, `joinMatch`, `startMatch`, `leaveMatch`.
 
@@ -401,6 +479,8 @@ NUI callbacks: `closeMenu`, `createMatch`, `joinMatch`, `startMatch`, `leaveMatc
 ### 1. Letakkan resource
 
 Pastikan folder `resources/[wtbg]` ada di `server-data/resources/` (atau path resource server Anda).
+
+Gunakan OneSync (`onesync on` / Infinity). Jangan start ESX, QBCore, atau Qbox bersama stack ini.
 
 ### 2. `server.cfg` (contoh minimal)
 
@@ -414,21 +494,25 @@ ensure baseevents
 
 # WTBG stack (urutkan sesuai dependency)
 ensure wtbg_core
+ensure wtbg_party
 ensure wtbg_match
 ensure wtbg_combat
 ensure wtbg_ui
 ```
 
+Chat dan spawnmanager boleh tetap di-start. Restart server setelah install atau setelah copy folder `[wtbg]` yang di-update.
+
 ### 3. Uji cepat (dengan `Config.Debug = true`)
 
 1. Dua client join server → keduanya di lobby.
-2. Client A: `/creatematch` → dapat Match ID (mis. `1001`).
-3. Client B: `/joinmatch 1001`.
-4. Client A: `/startmatch`.
-5. Countdown → loadout → bertarung.
-6. Satu mati → result → kembali lobby.
+2. (Opsional) A invite B, B accept → `/party`.
+3. Client A: `/creatematch` → dapat Match ID (mis. `1001`); party ikut jika ada.
+4. Client B / party lain: `/joinmatch 1001`.
+5. Client A: `/startmatch`.
+6. Countdown → loadout → bertarung.
+7. Satu tim tersisa → result → kembali lobby (party tetap).
 
-Atau gunakan **F6** untuk menu yang sama.
+Atau gunakan **F6** untuk menu match yang sama.
 
 ---
 
@@ -437,7 +521,8 @@ Atau gunakan **F6** untuk menu yang sama.
 ```
 wtbg_core
     ↑
-    ├── wtbg_match  (dependency wtbg_core)
+    ├── wtbg_party  (dependency wtbg_core)
+    ├── wtbg_match  (dependency wtbg_core [+ party])
     │       ↑
     │       └── wtbg_combat  (dependency wtbg_core + wtbg_match)
     │
@@ -451,17 +536,59 @@ CFX eksternal yang dipakai:
 
 ---
 
+## Testing
+
+### Party
+
+1. A invite B (`/partyinvite [id]`).
+2. B accepts.
+3. `/party` shows A as LEADER.
+4. A leaves. B becomes leader.
+
+### Squad match
+
+1. Party ABCD. Party EFGH.
+2. A `/creatematch`. Whole party A enters waiting match.
+3. E `/joinmatch [id]`. Whole party E enters as team 2.
+4. `/startmatch`.
+5. Eliminate team 1. Team 2 wins. Result shows TEAM id, team kills, your kills, placement.
+6. After result, both parties still exist in lobby.
+
+### Edge cases
+
+- Party full, duplicate invite, expired invite, invite self
+- Member tries `/joinmatch` (rejected)
+- Leader disconnect, member disconnect
+- Disconnect during ACTIVE match (counts as elimination)
+- Whole squad eliminated, solo joining a squad match
+- Duplicate death, `/leavematch` while ACTIVE
+- Resource restart returns players to lobby; parties reset with the resource
+
+---
+
 ## Catatan Pengembangan
 
 ### Status proyek
 
-Ini **standalone prototype** (`0.1.0`):
+Ini **standalone prototype** (`0.1.0`) — milestone **M2 Party / Squad**:
 
 - Belum ada matchmaking otomatis / queue publik
 - Command create/join/start masih **dev-gated**
 - Belum ada persistence (stats, inventory, DB)
-- Belum ada team mode (field `teamId` sudah ada, belum dipakai)
+- Belum ada spectate camera, knock/revive, loot, zone, vehicles, plane
+- Belum ada auto squad fill
 - Map spawn masih hardcode di area airfield
+- Party dan match results in-memory only
+
+### Next milestone
+
+**M3 - Loot / Knock / Revive / Zone**
+
+Lalu:
+
+- M4 Plane / Drop / Vehicles / Spectate
+- M5 Stats / Ranked / Leaderboard
+- M6 Cosmetics / Battle Pass / Tournament tools
 
 ### Error codes (match)
 

@@ -13,8 +13,13 @@
                 <h1>WHITE TIGER<br>BATTLEGROUND <span>V2</span></h1>
                 <p id="lobby-status" class="status">Status: Lobby</p>
                 <p id="lobby-meta" class="meta"></p>
-                <p class="hint">F6 menu &nbsp;/&nbsp; /creatematch &nbsp;/&nbsp; /joinmatch</p>
+                <p class="hint">F6 menu &nbsp;/&nbsp; /partyinvite &nbsp;/&nbsp; /joinmatch</p>
             </div>
+            <aside id="party-panel" class="party-panel">
+                <p class="party-title">PARTY</p>
+                <p id="party-size" class="party-size">0 / 4</p>
+                <ul id="party-slots"></ul>
+            </aside>
         </section>
 
         <section id="menu" class="panel hidden">
@@ -31,6 +36,15 @@
             <button id="btn-leave" type="button" class="ghost">Leave Match</button>
         </section>
 
+        <section id="invite" class="panel hidden">
+            <p class="invite-kicker">PARTY INVITE</p>
+            <p id="invite-text" class="invite-text"></p>
+            <div class="invite-actions">
+                <button id="btn-accept" type="button">Accept</button>
+                <button id="btn-decline" type="button" class="ghost">Decline</button>
+            </div>
+        </section>
+
         <section id="hud" class="screen hidden">
             <div class="alive">
                 <span>ALIVE</span>
@@ -40,6 +54,10 @@
                 <span>KILLS</span>
                 <strong id="hud-kills">0</strong>
             </div>
+            <aside id="squad-panel" class="squad-panel hidden">
+                <p class="party-title">SQUAD</p>
+                <ul id="squad-slots"></ul>
+            </aside>
         </section>
 
         <section id="killfeed"></section>
@@ -54,11 +72,16 @@
                         <span>Your Kills</span>
                         <strong id="result-kills">0</strong>
                     </div>
+                    <div id="result-teamkills-wrap" class="hidden">
+                        <span>Team Kills</span>
+                        <strong id="result-teamkills">0</strong>
+                    </div>
                     <div>
                         <span>Placement</span>
                         <strong id="result-place">-</strong>
                     </div>
                 </div>
+                <ul id="result-squad" class="result-squad"></ul>
             </div>
         </section>
 

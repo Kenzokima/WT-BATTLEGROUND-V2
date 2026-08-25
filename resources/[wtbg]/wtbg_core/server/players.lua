@@ -9,6 +9,7 @@ local function newPlayer(source)
         state = WTBG.PlayerStates.LOBBY,
         matchId = nil,
         teamId = nil,
+        partyId = nil,
         alive = true,
         name = WTBG.PlayerName(source)
     }
@@ -142,6 +143,25 @@ function WTBG.Players.IsSessionReady(source)
     return sessionReady[source] == true
 end
 
+function WTBG.Players.SetParty(source, partyId)
+    local player = players[source]
+    if not player then
+        return false
+    end
+
+    player.partyId = partyId
+    return true
+end
+
+function WTBG.Players.GetPartyId(source)
+    local player = players[source]
+    if not player then
+        return nil
+    end
+
+    return player.partyId
+end
+
 function WTBG.Players.Notify(source, message)
     TriggerClientEvent('wtbg:core:notify', source, message)
 end
@@ -180,6 +200,14 @@ end)
 
 exports('SetAlive', function(source, alive)
     return WTBG.Players.SetAlive(tonumber(source), alive)
+end)
+
+exports('SetParty', function(source, partyId)
+    return WTBG.Players.SetParty(tonumber(source), partyId)
+end)
+
+exports('GetPlayerPartyId', function(source)
+    return WTBG.Players.GetPartyId(tonumber(source))
 end)
 
 exports('Notify', function(source, message)
