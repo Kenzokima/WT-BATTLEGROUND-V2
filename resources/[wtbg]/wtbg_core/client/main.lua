@@ -4,6 +4,23 @@ local function disableAutoSpawn()
     pcall(function()
         exports.spawnmanager:setAutoSpawn(false)
     end)
+
+    pcall(function()
+        exports.spawnmanager:setAutoSpawnCallback(function()
+            local coords = Config.LobbyCoords
+            exports.spawnmanager:spawnPlayer({
+                x = coords.x,
+                y = coords.y,
+                z = coords.z,
+                heading = coords.w,
+                model = Config.PedModel or 'mp_m_freemode_01',
+                skipFade = true
+            }, function()
+                WTBG.EnsureFreemodePed()
+            end)
+        end)
+        exports.spawnmanager:setAutoSpawn(false)
+    end)
 end
 
 local function stripWeapons(ped)
@@ -49,11 +66,12 @@ end
 
 local function spawnLobby(coords)
     DoScreenFadeOut(0)
-
+    disableAutoSpawn()
     WTBG.EnsureFreemodePed()
 
     local heading = coords.w or coords.heading or 0.0
     teleport(coords, heading)
+    WTBG.EnsureFreemodePed()
     WTBG.UnlockCombat()
 
     ShutdownLoadingScreen()
@@ -73,8 +91,20 @@ CreateThread(function()
         Wait(100)
     end
 
+    WTBG.EnsureFreemodePed()
     Wait(250)
     TriggerServerEvent('wtbg:core:sessionReady')
+end)
+
+CreateThread(function()
+    local expected = WTBG.ExpectedPedModel()
+    while true do
+        Wait(1000)
+        local ped = PlayerPedId()
+        if DoesEntityExist(ped) and GetEntityModel(ped) ~= expected then
+            WTBG.EnsureFreemodePed()
+        end
+    end
 end)
 
 CreateThread(function()
@@ -120,6 +150,13 @@ RegisterNetEvent('wtbg:core:notify', function(message)
         color = { 196, 48, 38 },
         args = { 'WTBG', message }
     })
+end)
+
+AddEventHandler('playerSpawned', function()
+    CreateThread(function()
+        Wait(0)
+        WTBG.EnsureFreemodePed()
+    end)
 end)
 
 AddEventHandler('onClientResourceStart', function(resourceName)

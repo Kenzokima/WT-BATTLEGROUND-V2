@@ -42,34 +42,44 @@ local function applyFemaleDefaults(ped)
     ClearAllPedProps(ped)
 end
 
+function WTBG.ExpectedPedModel()
+    return joaat(Config.PedModel or 'mp_m_freemode_01')
+end
+
 function WTBG.EnsureFreemodePed()
     local modelName = Config.PedModel or 'mp_m_freemode_01'
     local model = joaat(modelName)
-    local ped = PlayerPedId()
 
-    if GetEntityModel(ped) ~= model then
-        if not IsModelInCdimage(model) or not IsModelValid(model) then
-            return false
-        end
-
+    RequestModel(model)
+    local timeout = GetGameTimer() + 8000
+    while not HasModelLoaded(model) and GetGameTimer() < timeout do
         RequestModel(model)
-        local timeout = GetGameTimer() + 5000
-        while not HasModelLoaded(model) and GetGameTimer() < timeout do
-            Wait(10)
-        end
-
-        if not HasModelLoaded(model) then
-            return false
-        end
-
-        SetPlayerModel(PlayerId(), model)
-        SetModelAsNoLongerNeeded(model)
         Wait(0)
-        ped = PlayerPedId()
+    end
+
+    if not HasModelLoaded(model) then
+        WTBG.Debug('failed to load ped model', modelName)
+        return false
+    end
+
+    if GetEntityModel(PlayerPedId()) ~= model then
+        SetPlayerModel(PlayerId(), model)
+
+        local switchTimeout = GetGameTimer() + 3000
+        while GetEntityModel(PlayerPedId()) ~= model and GetGameTimer() < switchTimeout do
+            SetPlayerModel(PlayerId(), model)
+            Wait(50)
+        end
+    end
+
+    local ped = PlayerPedId()
+    if GetEntityModel(ped) ~= model then
+        WTBG.Debug('failed to switch ped model', modelName)
+        return false
     end
 
     SetPedDefaultComponentVariation(ped)
-    if model == `mp_f_freemode_01` then
+    if model == joaat('mp_f_freemode_01') then
         applyFemaleDefaults(ped)
     else
         applyMaleDefaults(ped)
@@ -77,6 +87,7 @@ function WTBG.EnsureFreemodePed()
 
     SetEntityVisible(ped, true, false)
     ResetEntityAlpha(ped)
+    SetModelAsNoLongerNeeded(model)
     WTBG.EnableFriendlyFire()
     return true
 end
