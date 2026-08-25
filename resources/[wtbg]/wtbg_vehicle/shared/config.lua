@@ -1,7 +1,7 @@
 VehicleConfig = {}
 
 VehicleConfig.Enabled = true
-VehicleConfig.SpawnCount = 50
+VehicleConfig.SpawnCount = WTBG.Balance.Vehicle.SpawnCount
 VehicleConfig.Models = {
     `draugur`,
     `draugur`,

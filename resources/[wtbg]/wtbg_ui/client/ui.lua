@@ -42,8 +42,18 @@ local function isDeploying()
     return ok and landed == false
 end
 
+local function isSpectating()
+    if GetResourceState('wtbg_spectator') ~= 'started' then
+        return false
+    end
+    local ok, value = pcall(function()
+        return exports.wtbg_spectator:IsSpectating()
+    end)
+    return ok and value == true
+end
+
 local function canUseInventory()
-    if screen ~= 'match' or not matchPlayable or isDowned() or isDeploying() then
+    if screen ~= 'match' or not matchPlayable or isDowned() or isDeploying() or isSpectating() then
         return false
     end
     return not IsPedInAnyVehicle(PlayerPedId(), false)
@@ -53,8 +63,19 @@ local function pushGuide()
     if screen ~= 'match' or invOpen or bagOpen then
         return
     end
+    if not matchPlayable and not isSpectating() then
+        if lastGuide ~= '' then
+            lastGuide = ''
+            nui({ action = 'guide', rows = {} })
+        end
+        return
+    end
     local rows
-    if combatCtx and (combatCtx.kind == 'reviveHint' or combatCtx.kind == 'revive') then
+    if isSpectating() then
+        rows = {
+            { key = '← / →', label = 'SWITCH PLAYER' }
+        }
+    elseif combatCtx and (combatCtx.kind == 'reviveHint' or combatCtx.kind == 'revive') then
         rows = {
             { key = 'HOLD E', label = 'REVIVE' },
             { key = 'F2 / TAB', label = 'INVENTORY' }
@@ -81,6 +102,11 @@ end
 
 local function pushContext()
     if screen ~= 'match' or invOpen or bagOpen then
+        return
+    end
+    if isSpectating() then
+        nui({ action = 'context', show = false })
+        pushGuide()
         return
     end
     if combatCtx then
@@ -147,6 +173,7 @@ RegisterNetEvent('wtbg:ui:showLobby', function(data)
     setFocus(false)
     nui({ action = 'context', show = false })
     nui({ action = 'guide', rows = {} })
+    nui({ action = 'spectator', show = false })
     nui({
         action = 'showLobby',
         status = data and data.status or 'Lobby',
@@ -189,8 +216,25 @@ RegisterNetEvent('wtbg:ui:killfeed', function(data)
         action = 'killfeed',
         killer = data and data.killer or nil,
         victim = data and data.victim or '',
-        kind = data and data.kind or 'kill'
+        kind = data and data.kind or 'kill',
+        ms = tonumber(Config.KillfeedMs) or 5000
     })
+end)
+
+RegisterNetEvent('wtbg:profile:self', function(stats)
+    nui({ action = 'profile', stats = type(stats) == 'table' and stats or nil })
+end)
+
+RegisterNetEvent('wtbg:history:self', function(payload)
+    nui({
+        action = 'history',
+        rows = payload and payload.rows or nil,
+        error = payload and payload.error or nil
+    })
+end)
+
+RegisterNetEvent('wtbg:history:invalidate', function()
+    nui({ action = 'historyInvalidate' })
 end)
 
 local function applyBleed(seconds)
@@ -230,6 +274,7 @@ RegisterNetEvent('wtbg:ui:showResult', function(data)
     closeInventory()
     setInviteFocus(false)
     setFocus(false)
+    nui({ action = 'spectator', show = false })
     nui({
         action = 'showResult',
         isWinner = data and data.isWinner or false,
@@ -394,6 +439,13 @@ end)
 RegisterNetEvent('wtbg:match:playerDied', function()
     matchPlayable = false
     closeInventory()
+    nui({ action = 'context', show = false })
+    lastGuide = ''
+    if isSpectating() then
+        pushGuide()
+    else
+        nui({ action = 'guide', rows = {} })
+    end
 end)
 
 RegisterNetEvent('wtbg:match:finished', function()
@@ -404,6 +456,27 @@ RegisterNetEvent('wtbg:match:finished', function()
     closeInventory()
     nui({ action = 'context', show = false })
     nui({ action = 'guide', rows = {} })
+    nui({ action = 'spectator', show = false })
+end)
+
+AddEventHandler('wtbg:ui:spectator', function(data)
+    closeInventory()
+    lastGuide = ''
+    if type(data) ~= 'table' or not data.show then
+        nui({ action = 'spectator', show = false })
+        pushGuide()
+        return
+    end
+    nui({
+        action = 'spectator',
+        show = true,
+        target = tonumber(data.target),
+        name = data.name,
+        downed = data.downed and true or false,
+        kills = tonumber(data.kills) or 0
+    })
+    nui({ action = 'context', show = false })
+    pushGuide()
 end)
 
 RegisterNUICallback('pickupLoot', function(data, cb)
@@ -439,6 +512,16 @@ end)
 RegisterNUICallback('leaveMatch', function(_, cb)
     TriggerServerEvent('wtbg:match:leave')
     setFocus(false)
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('requestProfile', function(_, cb)
+    TriggerServerEvent('wtbg:profile:request')
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('requestHistory', function(_, cb)
+    TriggerServerEvent('wtbg:history:request')
     cb({ ok = true })
 end)
 

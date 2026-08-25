@@ -2,9 +2,9 @@
 
 Prototype standalone **battleground / last-team-standing** untuk **FiveM (GTA5)**.
 
-Milestone saat ini: **M4A — Plane / Drop / Parachute**.
+Milestone saat ini: **M5B — Match History**.
 
-Pemain mulai di lobby, opsional membentuk party, membuat atau bergabung ke match, lalu bertarung di routing bucket terpisah sampai tersisa satu tim hidup. Match memakai knock/revive, loot BR, zone, dan HUD kompetitif.
+Pemain mulai di lobby, opsional membentuk party, membuat atau bergabung ke match, lalu bertarung di routing bucket terpisah sampai tersisa satu tim hidup. Match memakai knock/revive, loot BR, zone, dan HUD kompetitif. Profil lifetime dan history match selesai disimpan di MariaDB lewat oxmysql.
 
 | | |
 |---|---|
@@ -33,6 +33,8 @@ Pemain mulai di lobby, opsional membentuk party, membuat atau bergabung ke match
 13. [Dependensi Antar Resource](#dependensi-antar-resource)
 14. [Testing](#testing)
 15. [Catatan Pengembangan](#catatan-pengembangan)
+16. [M5A Persistence](#m5a-persistence)
+17. [M5B Match History](#m5b-match-history)
 
 ---
 
@@ -53,7 +55,7 @@ Mode permainan saat ini:
 - Death → eliminate → last alive team menang
 - Layar result singkat, lalu kembali ke lobby (party tetap ada)
 
-Mode permainan saat ini mencakup lobby, party, match bucket, combat DOWN/revive/finish, loot BR, zone, dan HUD/inventory M3D. Belum ada plane, kendaraan, spectator, ranked, cosmetics, atau framework (ESX/QBCore/Qbox).
+Mode permainan saat ini mencakup lobby, party, match bucket, combat DOWN/revive/finish, loot BR, zone, plane drop, kendaraan, teammate spectator, HUD/inventory, dan profil/stat lifetime. Belum ada ranked, match history, cosmetics, atau framework (ESX/QBCore/Qbox).
 
 ---
 
@@ -65,10 +67,15 @@ WT-BATTLEGROUND-V2/
 ├── resources.cfg
 └── resources/
     ├── [wtbg]/                 # Logika custom WTBG
-    │   ├── wtbg_core/          # Session, lobby, player state, ped
+    │   ├── wtbg_core/          # Session, lobby, player state, ped, profiles
     │   ├── wtbg_party/         # Party membership & invites
     │   ├── wtbg_match/         # Match lifecycle & commands
-    │   ├── wtbg_combat/        # Loadout, death reporting
+    │   ├── wtbg_combat/        # Loadout, DOWN / revive / finish
+    │   ├── wtbg_loot/          # BR inventory and world loot
+    │   ├── wtbg_zone/          # Play zone
+    │   ├── wtbg_drop/          # Plane / jump / parachute
+    │   ├── wtbg_vehicle/       # Match vehicles
+    │   ├── wtbg_spectator/     # Teammate spectator
     │   └── wtbg_ui/            # NUI lobby / party / HUD / result
     ├── [gamemodes]/            # CFX: basic-gamemode + maps
     ├── [gameplay]/             # CFX: playernames
@@ -81,15 +88,21 @@ WT-BATTLEGROUND-V2/
 
 ## Resource Custom `[wtbg]`
 
-### 1. `wtbg_core` — Session & Lobby
+### 1. `wtbg_core` — Session, Lobby, Profiles
 
-**Peran:** fondasi session pemain, spawn lobby, ped freemode, kontrol dunia (wanted/dispatch/density).
+**Peran:** fondasi session pemain, spawn lobby, ped freemode, kontrol dunia, dan persistence profil.
 
 | Path | Fungsi |
 |------|--------|
 | `shared/config.lua` | Konfigurasi global |
 | `shared/utils.lua` | State enums, helper debug/parse |
+| `sql/001_players.sql` | Schema `wtbg_players` (idempotent) |
+| `sql/002_match_history.sql` | Schema `wtbg_matches` + `wtbg_match_players` |
+| `server/database.lua` | Tunggu oxmysql, apply schema 001 lalu 002 |
 | `server/players.lua` | Registry pemain + exports |
+| `server/profiles.lua` | Load/create/cache/save profil |
+| `server/match_history.lua` | Persist + query history match |
+| `server/stats.lua` | Match runtime stats, lifetime merge, snapshot history |
 | `server/main.lua` | Session ready, player drop, resource lifecycle |
 | `client/appearance.lua` | Freemode ped, friendly fire, unlock combat |
 | `client/main.lua` | Spawn lobby, teleport, strip weapons, world cleanup |
@@ -177,6 +190,31 @@ Knock terjadi di match `ACTIVE`. Player downed masih `alive` (tim belum terelimi
 | `web/index.html` | Struktur layar |
 | `web/style.css` | Styling |
 | `web/app.js` | Logic NUI + callbacks |
+
+---
+
+### 6. `wtbg_spectator` — Teammate Spectator
+
+**Peran:** setelah `DEAD`, kamera follow teammate `ALIVE`/`DOWN` yang divalidasi server. Tidak ada enemy spectate, FFA, atau solo.
+
+| Path | Fungsi |
+|------|--------|
+| `server/spectator.lua` | Eligibility, kandidat tim, next/prev |
+| `client/spectator.lua` | Third-person follow cam, hide local ped |
+
+Kontrol: `←` / `→` ganti teammate. Spectator berhenti saat squad wipe, match `FINISHED`, leave, atau disconnect.
+
+---
+
+### 7. Balance (`wtbg_core/shared/balance.lua`)
+
+Gameplay values live in `WTBG.Balance`. Resource configs read them; do not copy the same number into combat/loot/UI separately.
+
+GTA ped health is offset by 100 (`NativeOffset`). Gameplay 100 HP = native 200. Helpers: `WTBG.NativeHealth` / `WTBG.GameplayHealth`.
+
+Set `WTBG.Balance.Preset = 'FAST_TEST'` to shorten plane/zone/result waits only. Combat damage is unchanged.
+
+Dev: `/balanceinfo` (`Config.Debug` or `wtbg.dev`).
 
 ---
 
@@ -312,6 +350,7 @@ Ubah koordinat / loadout / angka di file ini — resource lain membaca config le
 | `/leavematch` | Semua | Keluar match / kembali lobby. Saat ACTIVE = eliminasi |
 | `/matches` | Dev / console | List match aktif |
 | `/wtbgmenu` | Client | Toggle menu lobby (sama dengan F6) |
+| `/profileinfo` `/statsinfo` | Dev (`Debug` atau ACE `wtbg.dev`) | Print cached profile snapshot |
 
 ### Party commands
 
@@ -351,6 +390,7 @@ Slot **4 / 5** (throwable / heal) tidak ditambah; grenade/smoke/heal tetap lewat
 - **Join** (input Match ID)
 - **Start Match**
 - **Leave Match**
+- **Stats** — panel profil lifetime (snapshot server, bukan query DB)
 
 > Saat `Config.Debug = true`, gate `canDev` selalu lolos. Untuk production, set `Debug = false` dan berikan ACE `wtbg.dev` ke admin.
 
@@ -428,6 +468,11 @@ Returned tables are copies. Gameplay state tidak diambil dari client.
 | `SetAlive(source, alive)` | Set alive flag |
 | `SetParty(source, partyId)` | Bind ke party |
 | `Notify(source, message)` | Notifikasi |
+| `GetPrimaryIdentifier(source)` | Canonical `license:` (fallback `license2:`) |
+| `GetProfile(source)` | Copy profil cache (bukan table internal) |
+| `GetStats(source)` | Snapshot derived (K/D, win rate, avg placement) |
+| `IsProfileLoaded(source)` | Cache siap (`loaded`) |
+| `GetRecentMatchHistory(source, limit, cb)` | Recent self-history (async, sanitized) |
 | `EnsureFreemodePed` (client) | Pastikan model ped |
 | `UnlockCombat` (client) | Unfreeze + enable control |
 | `EnableFriendlyFire` (client) | Friendly fire on |
@@ -473,14 +518,16 @@ Returned tables are copies. Gameplay state tidak diambil dari client.
 Layar:
 
 1. **Lobby** — branding *WHITE TIGER BATTLEGROUND V2*, status, hint command
-2. **Menu (F6)** — create / join / start / leave
+2. **Menu (F6)** — create / join / start / leave / stats
+3. **Profile** — lifetime stats + recent match history (F6 Stats)
 3. **Party panel** — anggota / invite status
 4. **Match HUD** — `ALIVE` count + `KILLS` (+ squad info)
-5. **Killfeed** — max 5 item, auto-remove
-6. **Result** — winner team / placement / kills
-7. **Toasts** — notifikasi singkat
+5. **Spectator** — target name / ALIVE|DOWN / kills, `←` `→`
+6. **Killfeed** — max 5 item, auto-remove
+7. **Result** — winner team / placement / kills
+8. **Toasts** — notifikasi singkat
 
-NUI callbacks: `closeMenu`, `createMatch`, `joinMatch`, `startMatch`, `leaveMatch`.
+NUI callbacks: `closeMenu`, `createMatch`, `joinMatch`, `startMatch`, `leaveMatch`, `requestProfile`, `requestHistory`.
 
 ---
 
@@ -490,8 +537,10 @@ Repo ini adalah **server-data** (bukan binary FXServer). Remote GitHub: `https:/
 
 1. Arahkan txAdmin ke folder ini, atau jalankan FXServer dari sini dengan `+exec server.cfg`.
 2. OneSync sudah `on` di `server.cfg`. Jangan start ESX, QBCore, atau Qbox bersama stack ini.
-3. Urutan `ensure` ada di `resources.cfg`.
-4. Jangan commit `sv_licenseKey` atau Steam Web API key. txAdmin yang mengisi license.
+3. Install **oxmysql** (Overextended) di resources, lalu `ensure oxmysql` sebelum `wtbg_core` (sudah di `resources.cfg`).
+4. Set `mysql_connection_string` di `server.cfg` / oxmysql. Jangan taruh password di resource WTBG.
+5. Import schema sekali jika perlu: `sql/001_players.sql` lalu `sql/002_match_history.sql`. `wtbg_core` menjalankan `CREATE TABLE IF NOT EXISTS` berurutan saat oxmysql ready — tidak ada DROP.
+6. Jangan commit `sv_licenseKey` atau Steam Web API key. txAdmin yang mengisi license.
 
 `chat`, `sessionmanager`, `hardcap`, dan `rconlog` datang dari artifact FXServer. Spawnmanager tetap di-start; `wtbg_core` mematikan auto-spawn.
 
@@ -514,12 +563,19 @@ Atau gunakan **F6** untuk menu match yang sama.
 ## Dependensi Antar Resource
 
 ```
+oxmysql
+    ↑
 wtbg_core
     ↑
     ├── wtbg_party  (dependency wtbg_core)
     ├── wtbg_match  (dependency wtbg_core [+ party])
     │       ↑
-    │       └── wtbg_combat  (dependency wtbg_core + wtbg_match)
+    │       ├── wtbg_combat  (dependency wtbg_core + wtbg_match)
+    │       ├── wtbg_loot
+    │       ├── wtbg_zone
+    │       ├── wtbg_drop
+    │       ├── wtbg_vehicle
+    │       └── wtbg_spectator  (dependency wtbg_core + wtbg_match)
     │
     └── wtbg_ui     (dependency wtbg_core)
 
@@ -527,6 +583,7 @@ CFX eksternal yang dipakai:
   spawnmanager  ← wtbg_core (setAutoSpawn / spawnPlayer)
   baseevents    ← wtbg_combat (onPlayerKilled / onPlayerDied)
   chat          ← wtbg_core notify (chat:addMessage)
+  oxmysql       ← wtbg_core (profil / stats)
 ```
 
 ---
@@ -549,6 +606,46 @@ CFX eksternal yang dipakai:
 5. Eliminate team 1. Team 2 wins. Result shows TEAM id, team kills, your kills, placement.
 6. After result, both parties still exist in lobby.
 
+### Spectator (M4C)
+
+1. Squad AB. A dies fully. A spectates B. F2/TAB and E do nothing.
+2. B goes DOWN. A stays on B, HUD shows DOWN. Revive B. HUD shows ALIVE.
+3. Add C. A cycles `←` `→` between B and C. Cannot spectate enemies.
+4. B dies while watched. Camera switches to C. C dies. Spectator ends, result shows.
+5. FFA death does not spectate enemies.
+6. `ensure wtbg_spectator` mid-spectate: camera cleans; if still DEAD with a teammate, spectator restores. Combat stays blocked.
+
+### Profile / stats (M5A)
+
+1. Join baru: satu row `wtbg_players`, level 1, xp 0, stats 0.
+2. Reconnect: row yang sama, bukan duplikat license.
+3. Ganti display name, reconnect: nama ter-update, stats sama.
+4. Selesaikan match (contoh 3 kill / 1 death / placement 2): `matches +1`, lifetime += match stats, `top3 +1` di SQUAD, `total_placement +2`. Result UI tidak menunggu SQL.
+5. Menang: `wins +1`, placement 1, `top3 +1`.
+6. DOWN lalu revive: deaths tidak bertambah. Full eliminate: deaths +1 sekali.
+7. Mati zone: death +1, tanpa kill/damage pemain.
+8. A damage, B finish dalam 15s (≥20 dmg): B kill, A assist. Revive dulu: kontribusi lama dibersihkan.
+9. Longest kill memakai jarak ped server. Lifetime memakai max.
+10. Disconnect saat ACTIVE: eliminasi existing, stats tetap finalize tanpa source.
+11. DB down: log, gameplay lanjut, profil ephemeral, tidak retry tiap frame.
+12. Dua session license sama: satu owner; session kedua tidak menulis DB.
+13. Restart `wtbg_core` di luar match ACTIVE: schema tidak di-drop, profil reload.
+
+### Match history (M5B)
+
+1. Selesaikan 1 match: 1 row `wtbg_matches`, 1 row `wtbg_match_players` per peserta ber-profile.
+2. Squad 4 finish #2: `match_id` + `team_id` sama, `placement = 2`, kills/damage unik.
+3. Winner squad: `winner_team_id` benar, semua anggota `won = 1`, `placement = 1`.
+4. Member mati awal, tim #3: history member itu `placement = 3`.
+5. Disconnect ACTIVE: row tetap ada, `disconnected = 1`, stats + placement final.
+6. Cancel sebelum result: tidak ada row history.
+7. Dua match bersamaan: history terpisah, tidak tercampur.
+8. Ganti nama: history match lama menyimpan nama saat itu.
+9. F6 Stats → Recent: 10 terbaru, tanpa license/profile id.
+10. DB down saat buka history: `MATCH HISTORY UNAVAILABLE`; Overview lifetime tetap dari cache.
+
+History **tidak di-backfill** dari lifetime M5A. Match sebelum M5B tidak punya row history.
+
 ### Edge cases
 
 - Party full, duplicate invite, expired invite, invite self
@@ -565,25 +662,55 @@ CFX eksternal yang dipakai:
 
 ### Status proyek
 
-Ini **standalone prototype** (`0.1.0`) — milestone **M3A Knock / Revive**:
+Ini **standalone prototype** (`0.1.0`) — milestone **M5B Match History**:
 
 - Belum ada matchmaking otomatis / queue publik
 - Command create/join/start masih **dev-gated**
-- Belum ada persistence (stats, inventory, DB)
-- Belum ada spectate camera, loot, zone, vehicles, plane
+- Lifetime profile + completed match history ada; **belum** ranked, leaderboard, season, XP gain
+- Belum ada freecam / admin observer / killcam
 - Belum ada auto squad fill
-- Map spawn masih hardcode di area airfield
-- Party dan match results in-memory only
+- Party membership masih in-memory
+- Restart `wtbg_core` saat match ACTIVE tidak merekonstruksi history in-progress
 
 ### Next milestone
 
-**M3B - Loot / Zone**
+**M5C+** — bukan bagian M5B:
 
-Lalu:
+- Ranked / MMR / leaderboard / season
+- Cosmetics / Battle Pass / Tournament tools
 
-- M4 Plane / Drop / Vehicles / Spectate
-- M5 Stats / Ranked / Leaderboard
-- M6 Cosmetics / Battle Pass / Tournament tools
+### BALANCE NOTES
+
+Current baseline (gameplay values):
+
+| | |
+|---|---|
+| Health | 100 gameplay HP (native 200) |
+| Max armor | 100, plates +25 |
+| Bandage | 3s, +25, cap 75 HP |
+| Medkit | 6s, full heal |
+| Bleedout | 30s |
+| Revive | 6s, 50 HP, 0 armor |
+| Finish | 2.5s |
+| Plane | 80s full-map route, jump delay 3s, force chute 92m AGL |
+| Vehicles | 40 world spawns (Draugur-majority mix) |
+| Result | 6s |
+| Killfeed | 5s, max 5 |
+| Zone | full GTA land, ~11–12 min at `TimeScale = 1.0` |
+
+Weapon **damage, spread, and headshots use GTA defaults**. WTBG only applies recoil-shake feel (stronger while sprinting/jumping). No weapons.meta / handling.meta.
+
+Weapon pool: Carbine, Assault Rifle, SMG, Micro SMG, Pump Shotgun, Pistol, Combat Pistol, grenade/molotov/smoke.
+
+Provisional — needs 8–16 player tests:
+
+- Vehicle density (40) vs populated matches
+- Zone damage on full map
+- Weapon TTK with GTA defaults + armor
+- Plane 80s jump distribution
+- Loot spawn weights (pistols/SMGs more common than AR/shotgun)
+
+FAST_TEST shortens waits only. Do not treat current zone/vehicle numbers as ranked production values.
 
 ### Error codes (match)
 
@@ -609,7 +736,90 @@ Setiap match memakai **routing bucket sendiri** (`bucket = match.id`) agar pemai
 
 ### History
 
-Match yang selesai disimpan di memory (max 20 entri) untuk debug internal — belum di-expose ke UI.
+Match yang selesai disimpan di memory (max 20 entri) untuk debug internal — belum di-expose ke UI. Lifetime totals ada di `wtbg_players`. Per-match history adalah M5B.
+
+---
+
+## M5A Persistence
+
+oxmysql + MariaDB/MySQL. Credential hanya di server config, bukan di resource WTBG.
+
+**Identifier:** `license:` Rockstar (fallback `license2:` jika `license:` tidak ada). Bukan source, bukan nama. Satu session aktif per license.
+
+**Lifecycle:**
+
+```
+playerJoining / sessionReady
+→ async load/create wtbg_players
+→ cache memory
+
+match becameActive
+→ MatchStats[matchId][source] (license/profileId snapshot)
+
+combat events
+→ memory only
+
+serverFinished
+→ merge lifetime sekali (idempotent)
+→ async UPDATE
+→ result UI tidak menunggu SQL
+
+disconnect
+→ flush dirty profile
+→ participant stats tetap di match pack sampai finalize
+```
+
+**Match cancelled / destroyed sebelum result:** tidak persist match stats, tidak increment `matches`.
+
+**Stats:**
+
+| Field | Sumber |
+|------|--------|
+| kills / deaths | `wtbg:match:playerEliminated` setelah `ReportDeath` (DOWN bukan death) |
+| damage / assists / headshots | OneSync `weaponDamageEvent` ter-validasi |
+| longest kill | jarak `GetEntityCoords` killer/victim saat eliminate |
+| placement / win / top3 | `wtbg_match` result; top3 hanya mode `SQUAD` |
+| K/D, win rate, avg placement | derived, tidak disimpan |
+
+**Assist:** musuh lain, ≥20 damage tervalidasi, 15 detik sebelum eliminate, bukan killer. Revive sukses menghapus contributor lama.
+
+**Headshot:** `weaponDamageEvent.hitComponent == 20` per hit yang lolos clamp. Bukan anti-cheat penuh; jika event tidak ada, stat tetap 0.
+
+**Damage:** tidak dari client event. Clamp ke sisa HP/armor efektif. Friendly fire dan zone tidak dihitung.
+
+**DB gagal:** log, profil ephemeral `persist=false`, tidak membuat row palsu, tidak retry per frame. Gameplay tetap jalan.
+
+**Save:** satu UPDATE per participant saat finalize; flush dirty tiap 5 menit; flush saat drop / `onResourceStop`. Crash keras tidak dijamin. SQL parameterized.
+
+**Asumsi:** satu owner profil per license. Session kedua tidak menulis stats.
+
+---
+
+## M5B Match History
+
+Completed matches only. Snapshot diambil dari finalisasi M5A yang sama (bukan tracker kedua).
+
+```
+serverFinished
+→ snapshot (identity + stats + placement + timestamps)
+→ lifetime merge (async)
+→ history transaction (async)
+→ result UI tidak menunggu SQL
+```
+
+**Tables:** `wtbg_matches` (unique `match_id` runtime), `wtbg_match_players` (unique `match_id, profile_id`). FK `match_db_id → wtbg_matches.id`.
+
+**Timestamps:** start = `becameActive` (UTC), finish = `serverFinished`. `duration_seconds` integer. Nama di history adalah nama saat match, bukan nama profil terbaru.
+
+**Disconnect:** `disconnected = 1` hanya jika player drop saat pack ACTIVE. `/leavematch` dan result cleanup bukan disconnect. Peserta offline tetap tersimpan lewat snapshot `profileId/license/name`.
+
+**Cancelled / destroy tanpa result:** tidak ada history.
+
+**Query:** self only, `profile_id` dari cache server, default 10 / max 20, cooldown 2s, tidak load on join. NUI tidak menerima license atau DB id.
+
+**Gagal history:** lifetime tetap. Gagal lifetime: history tetap. Duplikat `match_id` dianggap sudah tersimpan. Retry 2x, tidak infinite.
+
+**Headshot** tetap definisi M5A (`weaponDamageEvent` component 20).
 
 ---
 

@@ -9,6 +9,12 @@ description 'WhiteTiger Battleground V2 - interface'
 
 dependency 'wtbg_core'
 
+shared_scripts {
+    '@wtbg_core/shared/config.lua',
+    '@wtbg_core/shared/balance.lua',
+    '@wtbg_core/shared/utils.lua'
+}
+
 ui_page 'web/index.html'
 
 files {

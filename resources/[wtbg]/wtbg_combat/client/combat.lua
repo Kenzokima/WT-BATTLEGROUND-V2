@@ -1,6 +1,7 @@
 local reported = false
 local downed = false
 local inMatch = false
+local eliminated = false
 local myTeamId = nil
 local downedPlayers = {}
 local holdingTarget = nil
@@ -148,7 +149,7 @@ local function enterDowned(seconds)
     NetworkResurrectLocalPlayer(coords.x, coords.y, coords.z, heading, true, true)
 
     ped = PlayerPedId()
-    SetEntityHealth(ped, 120)
+    SetEntityHealth(ped, Config.DownedHealth or 120)
     SetPedArmour(ped, 0)
     RemoveAllPedWeapons(ped, true)
     SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
@@ -157,7 +158,7 @@ local function enterDowned(seconds)
     SetPedCanBeTargetted(ped, false)
     SetPedCanRagdoll(ped, false)
     applyWrithe(ped)
-    TriggerEvent('wtbg:ui:bleed', tonumber(seconds) or Config.BleedoutTime or 25)
+    TriggerEvent('wtbg:ui:bleed', tonumber(seconds) or Config.BleedoutTime or 30)
 end
 
 local function nearestDowned(maxDist)
@@ -194,6 +195,7 @@ end)
 RegisterNetEvent('wtbg:match:begin', function()
     inMatch = true
     reported = false
+    eliminated = false
     downedPlayers = {}
     clearDownedLocal()
     if not useBrLoadout() then
@@ -216,6 +218,7 @@ end)
 RegisterNetEvent('wtbg:match:enter', function()
     inMatch = true
     reported = false
+    eliminated = false
     downedPlayers = {}
     clearDownedLocal()
 end)
@@ -226,6 +229,7 @@ end)
 
 RegisterNetEvent('wtbg:core:spawnLobby', function()
     inMatch = false
+    eliminated = false
     myTeamId = nil
     downedPlayers = {}
     clearDownedLocal()
@@ -233,8 +237,15 @@ end)
 
 RegisterNetEvent('wtbg:match:finished', function()
     inMatch = false
+    eliminated = false
     downedPlayers = {}
     clearDownedLocal()
+end)
+
+RegisterNetEvent('wtbg:match:playerDied', function()
+    eliminated = true
+    stopHold()
+    setHint(nil)
 end)
 
 RegisterNetEvent('wtbg:combat:knock', function(seconds)
@@ -313,11 +324,20 @@ CreateThread(function()
         local ped = PlayerPedId()
         local dead = IsEntityDead(ped) or IsPedDeadOrDying(ped, true) or IsPlayerDead(PlayerId())
 
-        if dead and not wasDead and not downed then
-            reportDowned()
+        if dead and not wasDead and not downed and not eliminated then
+            local spectating = false
+            if GetResourceState('wtbg_spectator') == 'started' then
+                local ok, spec = pcall(function()
+                    return exports.wtbg_spectator:IsSpectating()
+                end)
+                spectating = ok and spec
+            end
+            if not spectating then
+                reportDowned()
+            end
         end
 
-        if not dead and not downed then
+        if not dead and not downed and not eliminated then
             reported = false
         end
 
@@ -358,7 +378,15 @@ CreateThread(function()
     local range = tonumber(Config.ReviveRange) or 4.0
 
     while true do
-        local skip = not inMatch or downed
+        local skip = not inMatch or downed or eliminated
+        if not skip and GetResourceState('wtbg_spectator') == 'started' then
+            local ok, spec = pcall(function()
+                return exports.wtbg_spectator:IsSpectating()
+            end)
+            if ok and spec then
+                skip = true
+            end
+        end
         if not skip and GetResourceState('wtbg_drop') == 'started' then
             local ok, landed = pcall(function()
                 return exports.wtbg_drop:IsLanded()
@@ -419,8 +447,17 @@ exports('IsDowned', function()
 end)
 
 exports('BlockWorldInteract', function()
-    if downed or not inMatch then
+    if downed or not inMatch or eliminated then
         return true
+    end
+
+    if GetResourceState('wtbg_spectator') == 'started' then
+        local ok, spec = pcall(function()
+            return exports.wtbg_spectator:IsSpectating()
+        end)
+        if ok and spec then
+            return true
+        end
     end
 
     if GetResourceState('wtbg_drop') == 'started' then
@@ -434,4 +471,37 @@ exports('BlockWorldInteract', function()
 
     local range = tonumber(Config.ReviveRange) or 4.0
     return nearestDowned(range) ~= nil
+end)
+
+local feelByHash
+
+local function weaponFeel(hash)
+    if not feelByHash then
+        feelByHash = {}
+        local rows = WTBG.Balance and WTBG.Balance.WeaponFeel or {}
+        for name, row in pairs(rows) do
+            feelByHash[joaat(name)] = row
+        end
+    end
+    return feelByHash[hash]
+end
+
+CreateThread(function()
+    while true do
+        if inMatch and not downed and not eliminated then
+            local ped = PlayerPedId()
+            local _, hash = GetCurrentPedWeapon(ped, true)
+            local feel = weaponFeel(hash)
+            if feel and feel.recoil then
+                local amp = feel.recoil
+                if IsPedSprinting(ped) or IsPedJumping(ped) then
+                    amp = amp * 1.35
+                end
+                WTBG.Call(SetWeaponRecoilShakeAmplitude, hash, amp)
+            end
+            Wait(0)
+        else
+            Wait(400)
+        end
+    end
 end)

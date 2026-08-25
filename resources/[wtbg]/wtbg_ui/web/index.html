@@ -13,7 +13,7 @@
                 <h1>WHITE TIGER<br>BATTLEGROUND <span>V2</span></h1>
                 <p id="lobby-status" class="status">Status: Lobby</p>
                 <p id="lobby-meta" class="meta"></p>
-                <p class="hint">F6 menu &nbsp;/&nbsp; /partyinvite &nbsp;/&nbsp; /joinmatch</p>
+                <p class="hint">F6 menu &nbsp;/&nbsp; Stats &nbsp;/&nbsp; /partyinvite &nbsp;/&nbsp; /joinmatch</p>
             </div>
             <aside id="party-panel" class="party-panel">
                 <p class="party-title">PARTY</p>
@@ -34,6 +34,25 @@
             </div>
             <button id="btn-start" type="button">Start Match</button>
             <button id="btn-leave" type="button" class="ghost">Leave Match</button>
+            <button id="btn-stats" type="button" class="ghost">Stats</button>
+        </section>
+
+        <section id="profile" class="panel hidden">
+            <header>
+                <p>Profile</p>
+                <button id="btn-profile-back" type="button">Back</button>
+            </header>
+            <p id="profile-name" class="profile-name">-</p>
+            <p id="profile-note" class="profile-note"></p>
+            <div class="profile-tabs">
+                <button id="tab-overview" type="button" class="is-on">Overview</button>
+                <button id="tab-history" type="button">Recent</button>
+            </div>
+            <dl id="profile-grid" class="profile-grid"></dl>
+            <div id="profile-history" class="hidden">
+                <p id="history-status" class="history-status"></p>
+                <ul id="history-list"></ul>
+            </div>
         </section>
 
         <section id="invite" class="panel hidden">
@@ -96,6 +115,16 @@
                 <p id="drop-line"></p>
             </div>
             <div id="hud-keys" class="hud-keys"></div>
+            <div id="spec" class="spec hidden">
+                <p class="spec-kicker">SPECTATING</p>
+                <strong id="spec-name">Teammate</strong>
+                <p id="spec-state">ALIVE</p>
+                <span id="spec-kills">0 KILLS</span>
+                <div class="spec-nav">
+                    <em>← PREVIOUS</em>
+                    <em>NEXT →</em>
+                </div>
+            </div>
         </section>
 
         <section id="inventory" class="inv-shell hidden">

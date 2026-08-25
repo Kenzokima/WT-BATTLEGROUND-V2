@@ -24,7 +24,18 @@ local function downed()
 end
 
 local function canUseVehicle()
-    return inMatch and usable and not deploying() and not downed()
+    if not inMatch or not usable or deploying() or downed() then
+        return false
+    end
+    if GetResourceState('wtbg_spectator') == 'started' then
+        local ok, spec = pcall(function()
+            return exports.wtbg_spectator:IsSpectating()
+        end)
+        if ok and spec then
+            return false
+        end
+    end
+    return true
 end
 
 local function leaveVehicle(ped)

@@ -197,7 +197,7 @@ local function rollItem(pool, rarity)
     local weights = {}
     for i = 1, #ids do
         local def = LootItems[ids[i]]
-        local w = (def and rarity[def.rarity]) or 1
+        local w = (def and def.spawnWeight) or (def and rarity[def.rarity]) or 1
         weights[i] = w
         total = total + w
     end

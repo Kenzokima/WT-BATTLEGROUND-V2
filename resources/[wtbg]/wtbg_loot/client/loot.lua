@@ -3,6 +3,7 @@ local objects = {}
 local inMatch = false
 local nearest = nil
 local healOrigin = nil
+local healHp = nil
 local lastVicinity = ''
 local lastWorld = ''
 
@@ -295,19 +296,24 @@ RegisterNetEvent('wtbg:match:finished', function()
     inMatch = false
     clearAll()
     healOrigin = nil
+    healHp = nil
 end)
 
 RegisterNetEvent('wtbg:core:spawnLobby', function()
     inMatch = false
     clearAll()
     healOrigin = nil
+    healHp = nil
 end)
 
 RegisterNetEvent('wtbg:ui:heal', function(data)
     if data and data.ms then
-        healOrigin = GetEntityCoords(PlayerPedId())
+        local ped = PlayerPedId()
+        healOrigin = GetEntityCoords(ped)
+        healHp = GetEntityHealth(ped)
     else
         healOrigin = nil
+        healHp = nil
     end
 end)
 
@@ -345,9 +351,22 @@ CreateThread(function()
             publishVicinity(around)
 
             if healOrigin then
-                if #(GetEntityCoords(PlayerPedId()) - healOrigin) > (LootConfig.HealMoveCancel or 2.4) then
+                local ped = PlayerPedId()
+                local hp = GetEntityHealth(ped)
+                local cancel = false
+                if healHp and hp + 1 < healHp then
+                    cancel = true
+                elseif IsPedSprinting(ped) or IsPedJumping(ped) then
+                    cancel = true
+                elseif #(GetEntityCoords(ped) - healOrigin) > (LootConfig.HealMoveCancel or 2.4) then
+                    cancel = true
+                end
+                if cancel then
                     healOrigin = nil
+                    healHp = nil
                     TriggerServerEvent('wtbg:loot:cancelUse')
+                else
+                    healHp = hp
                 end
             end
 

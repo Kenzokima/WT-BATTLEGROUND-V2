@@ -3,13 +3,13 @@ DropConfig = {}
 DropConfig.Enabled = true
 
 DropConfig.Altitude = 550.0
-DropConfig.RouteDuration = 80
+DropConfig.RouteDuration = WTBG.Balance.Drop.RouteDuration
 DropConfig.RoutePadding = 700.0
-DropConfig.JumpStartDelay = 4.0
+DropConfig.JumpStartDelay = WTBG.Balance.Drop.JumpStartDelay
 DropConfig.AutoDropAtEnd = true
-DropConfig.AutoDropWarn = 5.0
-DropConfig.ParachuteHeight = 120.0
-DropConfig.ForceParachuteHeight = 92.0
+DropConfig.AutoDropWarn = WTBG.Balance.Drop.AutoDropWarn
+DropConfig.ParachuteHeight = WTBG.Balance.Drop.ParachuteHeight
+DropConfig.ForceParachuteHeight = WTBG.Balance.Drop.ForceParachuteHeight
 DropConfig.GroundDetectionDistance = 2.75
 
 DropConfig.PlaneModel = 'titan'

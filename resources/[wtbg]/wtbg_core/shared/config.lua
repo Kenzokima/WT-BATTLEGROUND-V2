@@ -20,18 +20,12 @@ Config.MatchSpawnPoints = {
 Config.MinPlayers = 2
 Config.MaxPlayers = 16
 
-Config.StartingHealth = 200
-Config.StartingArmor = 100
-
 Config.Loadout = {
-    { weapon = 'WEAPON_CARBINERIFLE', ammo = 250 },
-    { weapon = 'WEAPON_PISTOL', ammo = 120 }
+    { weapon = 'WEAPON_CARBINERIFLE', ammo = 180 },
+    { weapon = 'WEAPON_PISTOL', ammo = 60 }
 }
 
 Config.UseBRStartingLoadout = true
-
-Config.StartCountdown = 5
-Config.ResultDuration = 8
 
 Config.DevAce = 'wtbg.dev'
 
@@ -42,10 +36,3 @@ Config.PartyInviteTimeout = 30
 Config.SquadSize = 4
 Config.FriendlyFire = false
 Config.MatchMode = 'SQUAD'
-
-Config.BleedoutTime = 25
-Config.ReviveTime = 6
-Config.FinishTime = 2
-Config.ReviveRange = 4.0
-Config.FinishRange = 3.5
-Config.ReviveHealth = 140

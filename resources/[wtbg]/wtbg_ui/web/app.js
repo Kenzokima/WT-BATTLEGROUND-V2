@@ -1,6 +1,7 @@
 const app = document.getElementById('app');
 const lobby = document.getElementById('lobby');
 const menu = document.getElementById('menu');
+const profile = document.getElementById('profile');
 const invite = document.getElementById('invite');
 const hud = document.getElementById('hud');
 const result = document.getElementById('result');
@@ -20,6 +21,8 @@ const heal = document.getElementById('heal');
 const healBar = document.getElementById('heal-bar');
 const hudKeys = document.getElementById('hud-keys');
 const dropHud = document.getElementById('drop');
+const specPanel = document.getElementById('spec');
+let specTarget = null;
 let bleedTimer = null;
 let healTimer = null;
 let bagId = null;
@@ -292,9 +295,189 @@ function setScreen(name) {
     app.classList.remove('hidden');
 }
 
+let profileOpen = false;
+let lastProfile = null;
+let historyTab = 'overview';
+let historyState = 'idle';
+let historyRows = null;
+let historyOpenId = null;
+
+function fmt(n, digits) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '0';
+    if (digits == null) return String(Math.floor(v));
+    return v.toFixed(digits);
+}
+
+function setProfileRow(grid, label, value) {
+    const wrap = document.createElement('div');
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    wrap.appendChild(dt);
+    wrap.appendChild(dd);
+    grid.appendChild(wrap);
+}
+
+function renderProfile(stats) {
+    lastProfile = stats || null;
+    const nameEl = document.getElementById('profile-name');
+    const noteEl = document.getElementById('profile-note');
+    const grid = document.getElementById('profile-grid');
+    grid.innerHTML = '';
+    if (!stats) {
+        nameEl.textContent = 'PROFILE';
+        noteEl.textContent = 'Stats unavailable.';
+        return;
+    }
+    nameEl.textContent = stats.name || 'PLAYER';
+    noteEl.textContent = stats.persist === false ? 'Session stats only — not saved.' : '';
+    const rows = [
+        ['Matches', fmt(stats.matches)],
+        ['Wins', fmt(stats.wins)],
+        ['Win Rate', `${fmt(stats.winRate, 1)}%`],
+        ['Kills', fmt(stats.kills)],
+        ['Deaths', fmt(stats.deaths)],
+        ['K/D', fmt(stats.kd, 2)],
+        ['Assists', fmt(stats.assists)],
+        ['Damage', fmt(stats.damage)],
+        ['Headshots', fmt(stats.headshots)],
+        ['Top 3', fmt(stats.top3)],
+        ['Avg Place', fmt(stats.avgPlacement, 1)],
+        ['Longest Kill', `${fmt(stats.longestKill, 1)} m`]
+    ];
+    rows.forEach(([label, value]) => setProfileRow(grid, label, value));
+}
+
+function pad2(n) {
+    return String(n).padStart(2, '0');
+}
+
+function fmtDuration(seconds) {
+    const s = Math.max(0, Math.floor(Number(seconds) || 0));
+    const m = Math.floor(s / 60);
+    return `${m}:${pad2(s % 60)}`;
+}
+
+function fmtFinished(value) {
+    if (!value) return '';
+    const d = new Date(String(value).replace(' ', 'T') + 'Z');
+    if (Number.isNaN(d.getTime())) return '';
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return `${pad2(d.getUTCDate())} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}  ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+}
+
+function setHistoryTab(tab) {
+    historyTab = tab === 'history' ? 'history' : 'overview';
+    document.getElementById('tab-overview').classList.toggle('is-on', historyTab === 'overview');
+    document.getElementById('tab-history').classList.toggle('is-on', historyTab === 'history');
+    show(document.getElementById('profile-grid'), historyTab === 'overview');
+    show(document.getElementById('profile-history'), historyTab === 'history');
+    if (historyTab === 'history' && (historyState === 'idle' || historyState === 'stale')) {
+        historyState = 'loading';
+        renderHistory();
+        post('requestHistory');
+    }
+}
+
+function renderHistory() {
+    const status = document.getElementById('history-status');
+    const list = document.getElementById('history-list');
+    list.innerHTML = '';
+    if (historyState === 'loading') {
+        status.textContent = 'Loading';
+        return;
+    }
+    if (historyState === 'fail') {
+        status.textContent = 'Match history unavailable';
+        return;
+    }
+    if (!historyRows || !historyRows.length) {
+        status.textContent = 'No match history';
+        return;
+    }
+    status.textContent = '';
+    historyRows.forEach((row) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'history-item' + (row.won ? ' is-win' : '');
+        const top = document.createElement('div');
+        top.className = 'history-top';
+        const left = document.createElement('span');
+        left.textContent = `#${row.matchId}  ${row.mode || 'SQUAD'}`;
+        const place = document.createElement('span');
+        place.className = 'history-place';
+        place.textContent = row.won ? `WIN  #${row.placement}` : `#${row.placement}`;
+        top.append(left, place);
+        const sub = document.createElement('div');
+        sub.className = 'history-sub';
+        sub.innerHTML = '';
+        const k = document.createElement('span');
+        k.textContent = `${fmt(row.kills)} KILLS`;
+        const rest = document.createElement('span');
+        rest.textContent = `${fmt(row.damage)} DMG  ${fmtDuration(row.duration)}`;
+        sub.append(k, rest);
+        item.append(top, sub);
+        item.addEventListener('click', () => {
+            historyOpenId = historyOpenId === row.matchId ? null : row.matchId;
+            renderHistory();
+        });
+        if (historyOpenId === row.matchId) {
+            const detail = document.createElement('div');
+            detail.className = 'history-detail';
+            const bits = [
+                ['Kills', fmt(row.kills)],
+                ['Deaths', fmt(row.deaths)],
+                ['Assists', fmt(row.assists)],
+                ['Damage', fmt(row.damage)],
+                ['Headshots', fmt(row.headshots)],
+                ['Longest', `${fmt(row.longestKill, 1)} m`],
+                ['Team', row.teamId == null ? '-' : String(row.teamId)],
+                ['Date', fmtFinished(row.finishedAt)]
+            ];
+            if (row.disconnected) {
+                bits.push(['Left', 'Disconnect']);
+            }
+            bits.forEach(([label, value]) => {
+                const line = document.createElement('p');
+                line.textContent = `${label} `;
+                const span = document.createElement('span');
+                span.textContent = value;
+                line.appendChild(span);
+                detail.appendChild(line);
+            });
+            item.appendChild(detail);
+        }
+        list.appendChild(item);
+    });
+}
+
 function setMenu(open) {
-    show(menu, open);
+    if (!open) {
+        profileOpen = false;
+    }
+    show(profile, open && profileOpen);
+    show(menu, open && !profileOpen);
     app.classList.toggle('focus', open || !invite.classList.contains('hidden') || !inventory.classList.contains('hidden'));
+}
+
+function openProfile() {
+    profileOpen = true;
+    historyTab = 'overview';
+    setHistoryTab('overview');
+    show(menu, false);
+    show(profile, true);
+    if (lastProfile) {
+        renderProfile(lastProfile);
+    }
+    post('requestProfile');
+}
+
+function closeProfile() {
+    profileOpen = false;
+    show(profile, false);
+    show(menu, true);
 }
 
 function toast(message) {
@@ -305,7 +488,7 @@ function toast(message) {
     setTimeout(() => item.remove(), 3200);
 }
 
-function addKill(killer, victim, kind) {
+function addKill(killer, victim, kind, ms) {
     const item = document.createElement('div');
     item.className = 'feed-item';
     const left = document.createElement('span');
@@ -329,7 +512,7 @@ function addKill(killer, victim, kind) {
     while (killfeed.children.length > 5) {
         killfeed.removeChild(killfeed.lastChild);
     }
-    setTimeout(() => item.remove(), 3600);
+    setTimeout(() => item.remove(), Math.max(2000, Number(ms) || 5000));
 }
 
 function fillSlots(listEl, members, maxSize, numbered) {
@@ -371,6 +554,7 @@ function fillSlots(listEl, members, maxSize, numbered) {
             )));
             if (downed) row.classList.add('is-down');
             if (dead) row.classList.add('is-dead');
+            if (specTarget && member.source === specTarget) row.classList.add('is-spec');
             row.append(name, tag);
         }
         listEl.appendChild(row);
@@ -475,6 +659,29 @@ function setGuide(rows) {
     });
 }
 
+function setSpectator(data) {
+    if (!data || !data.show) {
+        specTarget = null;
+        hud.classList.remove('is-spec');
+        show(specPanel, false);
+        if (lastSquad) {
+            renderSquad(lastSquad);
+        }
+        return;
+    }
+    specTarget = Number(data.target) || null;
+    hud.classList.add('is-spec');
+    document.getElementById('spec-name').textContent = data.name || 'Teammate';
+    const state = document.getElementById('spec-state');
+    state.textContent = data.downed ? 'DOWN' : 'ALIVE';
+    state.classList.toggle('is-down', Boolean(data.downed));
+    document.getElementById('spec-kills').textContent = `${Number(data.kills) || 0} KILLS`;
+    show(specPanel, true);
+    if (lastSquad) {
+        renderSquad(lastSquad);
+    }
+}
+
 function renderResultSquad(teammates) {
     const list = document.getElementById('result-squad');
     list.innerHTML = '';
@@ -509,6 +716,29 @@ window.addEventListener('message', (event) => {
         case 'menu':
             setMenu(Boolean(data.open));
             break;
+        case 'profile':
+            renderProfile(data.stats || null);
+            break;
+        case 'history':
+            if (data.error) {
+                historyState = 'fail';
+                historyRows = null;
+            } else {
+                historyState = 'ok';
+                historyRows = Array.isArray(data.rows) ? data.rows : [];
+            }
+            if (historyTab === 'history') {
+                renderHistory();
+            }
+            break;
+        case 'historyInvalidate':
+            historyState = 'stale';
+            if (profileOpen && historyTab === 'history') {
+                historyState = 'loading';
+                renderHistory();
+                post('requestHistory');
+            }
+            break;
         case 'showLobby':
             setScreen('lobby');
             setMenu(false);
@@ -521,6 +751,7 @@ window.addEventListener('message', (event) => {
             setGuide([]);
             setDrop(null);
             setZone(null);
+            setSpectator(null);
             killfeed.innerHTML = '';
             document.getElementById('lobby-status').textContent = `Status: ${data.status || 'Lobby'}`;
             document.getElementById('lobby-meta').textContent = data.matchId
@@ -535,7 +766,7 @@ window.addEventListener('message', (event) => {
             renderSquad(data.squad);
             break;
         case 'killfeed':
-            addKill(data.killer, data.victim, data.kind);
+            addKill(data.killer, data.victim, data.kind, data.ms);
             break;
         case 'bleed':
             if (data.show) {
@@ -558,6 +789,7 @@ window.addEventListener('message', (event) => {
             setGuide([]);
             setDrop(null);
             setZone(null);
+            setSpectator(null);
             killfeed.innerHTML = '';
             document.getElementById('result-kicker').textContent = data.isWinner ? 'VICTORY' : 'MATCH OVER';
             document.getElementById('result-title').textContent = data.isWinner ? 'VICTORY' : 'MATCH OVER';
@@ -634,6 +866,9 @@ window.addEventListener('message', (event) => {
                 }
             }
             break;
+        case 'spectator':
+            setSpectator(data);
+            break;
         default:
             break;
     }
@@ -651,6 +886,10 @@ document.getElementById('join-id').addEventListener('keydown', (event) => {
 });
 document.getElementById('btn-start').addEventListener('click', () => post('startMatch'));
 document.getElementById('btn-leave').addEventListener('click', () => post('leaveMatch'));
+document.getElementById('btn-stats').addEventListener('click', () => openProfile());
+document.getElementById('btn-profile-back').addEventListener('click', () => closeProfile());
+document.getElementById('tab-overview').addEventListener('click', () => setHistoryTab('overview'));
+document.getElementById('tab-history').addEventListener('click', () => setHistoryTab('history'));
 document.getElementById('btn-accept').addEventListener('click', () => {
     post('acceptInvite', { partyId: invitePartyId });
     show(invite, false);

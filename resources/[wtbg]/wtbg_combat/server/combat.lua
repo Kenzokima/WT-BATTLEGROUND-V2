@@ -177,8 +177,9 @@ local function revive(target)
     exports.wtbg_match:SetDowned(target, false)
     broadcast(session.matchId, 'wtbg:combat:playerUp', target)
     restoreLoadout(target)
-    TriggerClientEvent('wtbg:combat:revived', target, cfgNum('ReviveHealth', 140))
+    TriggerClientEvent('wtbg:combat:revived', target, cfgNum('ReviveHealth', 150))
     TriggerClientEvent('wtbg:ui:bleed', target, nil)
+    TriggerEvent('wtbg:match:playerRevived', target, session.matchId)
     WTBG.Debug('revived', target)
     return true
 end
@@ -206,7 +207,7 @@ local function knock(victim, killer, weapon)
     info.source = victim
     local killerInfo
     killer, killerInfo = validKiller(info, killer)
-    local bleed = cfgNum('BleedoutTime', 25)
+    local bleed = cfgNum('BleedoutTime', 30)
     local t = nextToken()
 
     sessions[victim] = {
@@ -381,7 +382,7 @@ RegisterNetEvent('wtbg:combat:finishStart', function(targetId)
     local t = nextToken()
     session.finisher = finisher
     session.finishToken = t
-    local ms = math.floor(cfgNum('FinishTime', 2) * 1000)
+    local ms = math.floor(cfgNum('FinishTime', 2.5) * 1000)
     TriggerClientEvent('wtbg:ui:prompt', finisher, { kind = 'finish', ms = ms })
     TriggerClientEvent('wtbg:ui:prompt', target, { kind = 'beingFinished', ms = ms })
 

@@ -3,38 +3,32 @@ LootConfig = {}
 LootConfig.LootEnabled = true
 LootConfig.PickupRange = 2.35
 LootConfig.DropRange = 1.2
-LootConfig.HealMoveCancel = 2.4
 
-LootConfig.MaxAmmo = {
-    rifle = 180,
-    smg = 150,
-    shotgun = 48,
-    pistol = 90
-}
+local medical = WTBG.Balance.Medical
+local ammo = WTBG.Balance.Ammo
+local loot = WTBG.Balance.Loot
+local combat = WTBG.Balance.Combat
 
+LootConfig.HealMoveCancel = medical.HealMoveCancel
+LootConfig.MaxAmmo = ammo.Max
 LootConfig.MaxHealing = {
     bandage = 5,
     medkit = 2
 }
-
 LootConfig.MaxThrowables = {
     grenade = 3,
     molotov = 3,
     smoke = 3
 }
-
-LootConfig.BandageHeal = 25
-LootConfig.BandageUseTime = 3
-LootConfig.BandageMaxHealth = 175
-
-LootConfig.MedkitHeal = 0
-LootConfig.MedkitUseTime = 6
-
-LootConfig.ArmorPlateAmount = 25
-LootConfig.MaxArmor = 100
-
-LootConfig.StartPistol = false
-LootConfig.StartPistolAmmo = 24
+LootConfig.BandageHeal = medical.BandageHeal
+LootConfig.BandageUseTime = medical.BandageUseTime
+LootConfig.BandageMaxHealth = WTBG.NativeHealth(medical.BandageMaxHealth)
+LootConfig.MedkitHeal = medical.MedkitHeal
+LootConfig.MedkitUseTime = medical.MedkitUseTime
+LootConfig.ArmorPlateAmount = combat.ArmorPlate
+LootConfig.MaxArmor = combat.MaxArmor
+LootConfig.StartPistol = loot.StartPistol
+LootConfig.StartPistolAmmo = loot.StartPistolAmmo
 
 LootConfig.TierSlots = {
     low = 3,
@@ -42,32 +36,7 @@ LootConfig.TierSlots = {
     high = 8
 }
 
-LootConfig.TierWeights = {
-    low = {
-        empty = 8,
-        ammo = 26,
-        heal = 16,
-        armor = 6,
-        weapon = 22,
-        throwable = 4
-    },
-    medium = {
-        empty = 4,
-        ammo = 20,
-        heal = 14,
-        armor = 10,
-        weapon = 28,
-        throwable = 8
-    },
-    high = {
-        empty = 0,
-        ammo = 16,
-        heal = 12,
-        armor = 14,
-        weapon = 34,
-        throwable = 12
-    }
-}
+LootConfig.TierWeights = loot.TierWeights
 
 LootConfig.TierRarity = {
     low = {

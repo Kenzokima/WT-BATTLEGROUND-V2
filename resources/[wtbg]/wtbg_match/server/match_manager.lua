@@ -422,7 +422,7 @@ local function finishMatch(match)
     return true
 end
 
-local function markEliminated(match, source)
+local function markEliminated(match, source, killer)
     local member = match.players[source]
     if not member or not member.alive then
         return false
@@ -432,7 +432,6 @@ local function markEliminated(match, source)
     member.downed = false
     exports.wtbg_core:SetAlive(source, false)
     exports.wtbg_core:SetSessionState(source, WTBG.PlayerStates.DEAD)
-    TriggerEvent('wtbg:match:playerEliminated', source, match.id, match.state)
 
     recountAlive(match)
     recountAliveTeams(match)
@@ -446,6 +445,8 @@ local function markEliminated(match, source)
     else
         member.placement = match.alivePlayers + 1
     end
+
+    TriggerEvent('wtbg:match:playerEliminated', source, match.id, match.state, tonumber(killer))
 
     return true
 end
@@ -878,7 +879,7 @@ function WTBG.Match.ReportDeath(victim, killer, weapon, kind)
         killerMember = nil
     end
 
-    markEliminated(match, victim)
+    markEliminated(match, victim, killer)
 
     local info = {
         matchId = match.id,

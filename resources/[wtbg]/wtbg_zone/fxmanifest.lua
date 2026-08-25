@@ -13,6 +13,7 @@ dependency 'wtbg_combat'
 
 shared_scripts {
     '@wtbg_core/shared/config.lua',
+    '@wtbg_core/shared/balance.lua',
     '@wtbg_core/shared/utils.lua',
     'shared/config.lua'
 }

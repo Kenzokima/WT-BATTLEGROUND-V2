@@ -142,7 +142,8 @@ body {
     border: 1px solid #2c2f36;
 }
 
-#btn-close {
+#btn-close,
+#btn-profile-back {
     width: auto;
     height: auto;
     padding: 4px 8px;
@@ -162,6 +163,150 @@ body {
     background: #0b0c0f;
     border: 1px solid #2c2f36;
     padding: 0 12px;
+}
+
+#profile {
+    width: min(420px, 92vw);
+}
+
+.profile-name {
+    color: var(--ink);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.92rem;
+    margin-bottom: 4px;
+}
+
+.profile-note {
+    color: var(--muted);
+    font-size: 0.72rem;
+    min-height: 1em;
+    margin-bottom: 10px;
+}
+
+.profile-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.profile-tabs button {
+    height: 32px;
+    margin: 0;
+    background: #16181d;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    font-size: 0.68rem;
+}
+
+.profile-tabs button.is-on {
+    background: #1f242c;
+    color: var(--accent);
+}
+
+#profile-history {
+    max-height: min(42vh, 320px);
+    overflow-y: auto;
+}
+
+.history-status {
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    margin-bottom: 8px;
+}
+
+#history-list {
+    list-style: none;
+}
+
+.history-item {
+    width: 100%;
+    height: auto;
+    border: 0;
+    background: #14161b;
+    color: inherit;
+    text-align: left;
+    text-transform: none;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.history-item.is-win {
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.history-top,
+.history-sub {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.history-top {
+    color: var(--ink);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+}
+
+.history-item.is-win .history-place {
+    color: var(--accent);
+}
+
+.history-sub {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.history-detail {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    color: var(--muted);
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.history-detail span {
+    color: var(--ink);
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.profile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 18px;
+}
+
+.profile-grid div {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px solid #2c2f36;
+    padding-bottom: 4px;
+}
+
+.profile-grid dt {
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.62rem;
+}
+
+.profile-grid dd {
+    color: var(--ink);
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
 }
 
 #hud {
@@ -386,6 +531,90 @@ body {
 .squad-panel li.is-dead em,
 .squad-panel li.is-down em {
     color: inherit;
+}
+
+.squad-panel li.is-spec {
+    color: var(--ink);
+}
+
+.squad-panel li.is-spec .num {
+    color: var(--line);
+}
+
+.squad-panel li.is-spec span:nth-child(2) {
+    color: var(--ink);
+}
+
+#hud.is-spec .match-counts .kills,
+#hud.is-spec #context,
+#hud.is-spec #heal,
+#hud.is-spec #prompt,
+#hud.is-spec #downed {
+    display: none !important;
+}
+
+.spec {
+    position: absolute;
+    left: 50%;
+    bottom: clamp(78px, 13vh, 128px);
+    transform: translateX(-50%);
+    min-width: min(220px, 70vw);
+    text-align: center;
+    pointer-events: none;
+}
+
+.spec-kicker {
+    color: var(--line);
+    letter-spacing: 0.28em;
+    font-size: clamp(0.62rem, 1vw, 0.72rem);
+}
+
+.spec strong {
+    display: block;
+    margin-top: 6px;
+    font-size: clamp(1.05rem, 2vw, 1.35rem);
+    font-weight: 650;
+    letter-spacing: 0.04em;
+}
+
+#spec-state {
+    margin-top: 4px;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    font-size: clamp(0.68rem, 1.1vw, 0.78rem);
+}
+
+#spec-state.is-down {
+    color: var(--danger);
+}
+
+#spec-kills {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    letter-spacing: 0.16em;
+    font-size: clamp(0.62rem, 1vw, 0.72rem);
+}
+
+.spec-nav {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    margin-top: 10px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    font-size: clamp(0.58rem, 0.95vw, 0.68rem);
+}
+
+.spec-nav em {
+    font-style: normal;
+    color: var(--accent);
+}
+
+@media (max-height: 800px) {
+    .spec {
+        bottom: clamp(64px, 11vh, 96px);
+    }
 }
 
 .party-panel li,
