@@ -295,3 +295,88 @@ body {
         right: 12px;
     }
 }
+
+.party-panel,
+.squad-panel {
+    position: absolute;
+    top: clamp(18px, 3vh, 36px);
+    right: clamp(16px, 3vw, 40px);
+    width: min(240px, 42vw);
+    pointer-events: none;
+}
+
+.party-title {
+    letter-spacing: 0.22em;
+    font-size: 0.7rem;
+    color: var(--muted);
+}
+
+.party-size {
+    margin: 4px 0 8px;
+    color: var(--line);
+    font-size: 0.8rem;
+}
+
+.party-panel ul,
+.squad-panel ul,
+.result-squad {
+    list-style: none;
+}
+
+.party-panel li,
+.squad-panel li,
+.result-squad li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: clamp(0.78rem, 1.2vw, 0.9rem);
+}
+
+.party-panel li.empty,
+.squad-panel li.empty {
+    color: #5d5a54;
+}
+
+.party-panel em,
+.squad-panel em {
+    font-style: normal;
+    color: var(--line);
+    letter-spacing: 0.12em;
+    font-size: 0.68rem;
+}
+
+#invite {
+    z-index: 5;
+}
+
+.invite-kicker {
+    letter-spacing: 0.22em;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+.invite-text {
+    margin-bottom: 14px;
+}
+
+.invite-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.invite-actions button {
+    margin: 0;
+}
+
+.result-squad {
+    margin-top: 18px;
+    text-align: left;
+}
+
+.stats {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}

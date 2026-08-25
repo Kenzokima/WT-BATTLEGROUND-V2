@@ -33,6 +33,7 @@ function WTBG.CopyPlayerState(player)
         state = player.state,
         matchId = player.matchId,
         teamId = player.teamId,
+        partyId = player.partyId,
         alive = player.alive,
         name = player.name
     }

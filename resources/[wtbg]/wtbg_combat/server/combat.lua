@@ -57,6 +57,8 @@ RegisterNetEvent('wtbg:combat:playerDied', function(killerId, weapon)
             local killerState = exports.wtbg_core:GetPlayerState(killer)
             if not killerState or killerState.matchId ~= state.matchId then
                 killer = nil
+            elseif (not Config.FriendlyFire) and killerState.teamId and state.teamId and killerState.teamId == state.teamId then
+                killer = nil
             end
         end
     end

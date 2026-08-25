@@ -13,7 +13,10 @@ local errors = {
     match_ending = 'The match is already ending.',
     not_member = 'You are not in that match.',
     not_waiting = 'That match is not waiting to start.',
-    not_enough_players = ('Need at least %s players to start.'):format(Config.MinPlayers)
+    not_enough_players = ('Need at least %s players to start.'):format(Config.MinPlayers),
+    not_enough_teams = 'Need at least two teams to start.',
+    not_party_leader = 'Only the party leader can join a match.',
+    party_member_offline = 'A party member is not ready.'
 }
 
 local function tell(source, message)
