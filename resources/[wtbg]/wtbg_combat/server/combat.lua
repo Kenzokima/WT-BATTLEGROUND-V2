@@ -17,7 +17,9 @@ local function applyLoadout(source)
         return
     end
 
-    Weapons.ApplyLoadout(ped)
+    pcall(function()
+        Weapons.ApplyLoadout(ped)
+    end)
     TriggerClientEvent('wtbg:combat:applyLoadout', source)
 end
 

@@ -32,3 +32,5 @@ Config.StartCountdown = 5
 Config.ResultDuration = 8
 
 Config.DevAce = 'wtbg.dev'
+
+Config.PedModel = 'mp_m_freemode_01'

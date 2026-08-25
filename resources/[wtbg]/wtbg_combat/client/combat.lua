@@ -4,6 +4,7 @@ local function applyLocalLoadout()
     local ped = PlayerPedId()
     Weapons.ApplyLoadout(ped)
     reported = false
+    exports.wtbg_core:UnlockCombat()
 end
 
 local function resolveKiller(ped)

@@ -50,8 +50,11 @@ end
 local function spawnLobby(coords)
     DoScreenFadeOut(0)
 
+    WTBG.EnsureFreemodePed()
+
     local heading = coords.w or coords.heading or 0.0
     teleport(coords, heading)
+    WTBG.UnlockCombat()
 
     ShutdownLoadingScreen()
     ShutdownLoadingScreenNui()
