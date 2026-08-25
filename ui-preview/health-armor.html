@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WTBG Preview — Helmet / Armor / Health</title>
+  <style>
+    :root {
+      --helmet-fill: #c9a227;
+      --helmet-empty: rgba(40, 30, 8, 0.72);
+      --armor-fill: #1a3a6e;
+      --armor-empty: rgba(8, 16, 32, 0.72);
+      --health-fill: #5fd12e;
+      --health-empty: rgba(18, 42, 12, 0.72);
+      --ink: #ffffff;
+      --muted: rgba(255, 255, 255, 0.55);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Arial Black", "Arial Bold", Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 30% 20%, #3a4658 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 80%, #2a3340 0%, transparent 45%),
+        #1c222b;
+    }
+
+    .stage {
+      width: min(920px, 94vw);
+      padding: 28px;
+    }
+
+    .label {
+      font-family: Segoe UI, Arial, sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    .vitals {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      width: min(420px, 100%);
+    }
+
+    .vital-row {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .vital-row.is-empty {
+      opacity: 0.35;
+    }
+
+    .vital-icon {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.65));
+    }
+
+    .vital-icon svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .bar {
+      position: relative;
+      height: 28px;
+      border-radius: 2px;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+    }
+
+    .bar-track {
+      position: absolute;
+      inset: 0;
+    }
+
+    .bar-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 0%;
+      transition: width 160ms linear;
+    }
+
+    .bar.helmet .bar-track { background: var(--helmet-empty); }
+    .bar.helmet .bar-fill { background: var(--helmet-fill); }
+    .bar.armor .bar-track { background: var(--armor-empty); }
+    .bar.armor .bar-fill { background: var(--armor-fill); }
+    .bar.health .bar-track { background: var(--health-empty); }
+    .bar.health .bar-fill { background: var(--health-fill); }
+
+    .bar-text {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      padding-left: 10px;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+      font-variant-numeric: tabular-nums;
+      user-select: none;
+    }
+
+    .panel {
+      margin-top: 36px;
+      padding: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.28);
+      font-family: Segoe UI, Arial, sans-serif;
+    }
+
+    .panel h2 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+    }
+
+    .control {
+      display: grid;
+      grid-template-columns: 78px 1fr 54px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .control span {
+      font-size: 13px;
+      color: #d7dde6;
+    }
+
+    .control output {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #c9a227;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .actions button {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      font-family: Segoe UI, Arial, sans-serif;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .actions button:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .log {
+      margin-top: 14px;
+      min-height: 40px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #d7dde6;
+    }
+
+    .note {
+      margin-top: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .placement {
+      margin-top: 28px;
+      position: relative;
+      height: 250px;
+      border-radius: 10px;
+      border: 1px dashed rgba(255, 255, 255, 0.18);
+      background: rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+
+    .placement .tag {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      font-family: Segoe UI, Arial, sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .placement .minimap {
+      position: absolute;
+      left: 18px;
+      bottom: 92px;
+      width: 118px;
+      height: 78px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(40, 48, 58, 0.85);
+      display: grid;
+      place-items: center;
+      font-family: Segoe UI, Arial, sans-serif;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .placement .vitals {
+      position: absolute;
+      left: 18px;
+      bottom: 16px;
+      width: 280px;
+    }
+
+    .placement .vitals .bar { height: 20px; }
+    .placement .vitals .bar-text { font-size: 12px; padding-left: 8px; }
+    .placement .vitals .vital-icon { width: 16px; height: 16px; }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <p class="label">Preview · Helmet durability + Armor + Health</p>
+
+    <div class="vitals" id="vitals-demo"></div>
+
+    <div class="placement" aria-label="Posisi in-game">
+      <span class="tag">Posisi di game · di atas / samping minimap</span>
+      <div class="minimap">Minimap native</div>
+      <div class="vitals" id="vitals-ingame"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Nilai &amp; logic preview</h2>
+      <div class="controls">
+        <label class="control">
+          <span>Helmet</span>
+          <input id="helmet-range" type="range" min="0" max="100" value="100" />
+          <output id="helmet-out">100</output>
+        </label>
+        <label class="control">
+          <span>Armor</span>
+          <input id="armor-range" type="range" min="0" max="100" value="100" />
+          <output id="armor-out">100</output>
+        </label>
+        <label class="control">
+          <span>Health</span>
+          <input id="health-range" type="range" min="0" max="100" value="100" />
+          <output id="health-out">100</output>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="btn-headshot">Headshot −40</button>
+        <button type="button" id="btn-bodyshot">Bodyshot −25</button>
+        <button type="button" id="btn-reset">Reset full</button>
+      </div>
+
+      <p class="log" id="damage-log">
+        Logic preview: headshot makan helmet dulu. Kalau helm 0, sisa damage ke health.
+        Bodyshot makan armor dulu, baru health.
+      </p>
+      <p class="note">
+        Masih preview HTML — belum ada sistem helm di FiveM.
+        Kalau OK, nanti baru kita buat durability helm di combat + sync ke NUI.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const MAX = { helmet: 100, armor: 100, health: 100 };
+
+    const state = {
+      helmet: 100,
+      armor: 100,
+      health: 100,
+    };
+
+    const helmetRange = document.getElementById("helmet-range");
+    const armorRange = document.getElementById("armor-range");
+    const healthRange = document.getElementById("health-range");
+    const logEl = document.getElementById("damage-log");
+
+    const ICON = {
+      helmet: `
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M4 13c0-4.4 3.6-8 8-8s8 3.6 8 8v2h-2.2l-1.3 5H7.5l-1.3-5H4v-2zm2.1 0H18c0-3.3-2.7-6-6-6s-6 2.7-6 6z"/>
+        </svg>`,
+      armor: `
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.2 4.5 5v6.2c0 4.85 3.2 9.35 7.5 10.55C16.3 20.55 19.5 16.05 19.5 11.2V5L12 2.2z"/>
+        </svg>`,
+      health: `
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M9.2 3.2h5.6v5.6h5.6v5.6h-5.6v5.6H9.2v-5.6H3.6V8.8h5.6z"/>
+        </svg>`,
+    };
+
+    function clamp(n, min, max) {
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function vitalRow(kind, value, suffix) {
+      const max = MAX[kind];
+      const pct = (value / max) * 100;
+      const empty = value <= 0 ? " is-empty" : "";
+      return `
+        <div class="vital-row${empty}" data-kind="${kind}">
+          <div class="vital-icon" aria-hidden="true">${ICON[kind]}</div>
+          <div class="bar ${kind}">
+            <div class="bar-track"></div>
+            <div class="bar-fill" id="${kind}-fill${suffix}" style="width:${pct}%"></div>
+            <div class="bar-text"><span id="${kind}-text${suffix}">${value} | ${max}</span></div>
+          </div>
+        </div>`;
+    }
+
+    function mountBars() {
+      const html =
+        vitalRow("helmet", state.helmet, "") +
+        vitalRow("armor", state.armor, "") +
+        vitalRow("health", state.health, "");
+      const html2 =
+        vitalRow("helmet", state.helmet, "-2") +
+        vitalRow("armor", state.armor, "-2") +
+        vitalRow("health", state.health, "-2");
+      document.getElementById("vitals-demo").innerHTML = html;
+      document.getElementById("vitals-ingame").innerHTML = html2;
+    }
+
+    function syncSliders() {
+      helmetRange.value = String(state.helmet);
+      armorRange.value = String(state.armor);
+      healthRange.value = String(state.health);
+      document.getElementById("helmet-out").textContent = String(state.helmet);
+      document.getElementById("armor-out").textContent = String(state.armor);
+      document.getElementById("health-out").textContent = String(state.health);
+    }
+
+    function render(message) {
+      mountBars();
+      syncSliders();
+      if (message) logEl.textContent = message;
+    }
+
+    /**
+     * Preview damage rules (akan dipakai di game nanti):
+     * - Headshot: helmet absorbs first. Overflow -> health (armor tidak kena).
+     * - Bodyshot: armor absorbs first. Overflow -> health (helmet tidak kena).
+     */
+    function applyHeadshot(damage) {
+      let left = damage;
+      const beforeHelm = state.helmet;
+
+      if (state.helmet > 0) {
+        const taken = Math.min(state.helmet, left);
+        state.helmet -= taken;
+        left -= taken;
+      }
+
+      if (left > 0) {
+        state.health = clamp(state.health - left, 0, MAX.health);
+      }
+
+      const broken = beforeHelm > 0 && state.helmet === 0;
+      render(
+        `Headshot −${damage}: helm ${beforeHelm}→${state.helmet}` +
+          (left > 0 ? `, sisa ${left} ke HP (HP sekarang ${state.health})` : "") +
+          (broken ? ". Helm hancur." : "") +
+          (state.health <= 0 ? " Player down." : "")
+      );
+    }
+
+    function applyBodyshot(damage) {
+      let left = damage;
+      const beforeArmor = state.armor;
+
+      if (state.armor > 0) {
+        const taken = Math.min(state.armor, left);
+        state.armor -= taken;
+        left -= taken;
+      }
+
+      if (left > 0) {
+        state.health = clamp(state.health - left, 0, MAX.health);
+      }
+
+      render(
+        `Bodyshot −${damage}: armor ${beforeArmor}→${state.armor}` +
+          (left > 0 ? `, sisa ${left} ke HP (HP sekarang ${state.health})` : "") +
+          (state.health <= 0 ? " Player down." : "")
+      );
+    }
+
+    helmetRange.addEventListener("input", () => {
+      state.helmet = Number(helmetRange.value);
+      render();
+    });
+    armorRange.addEventListener("input", () => {
+      state.armor = Number(armorRange.value);
+      render();
+    });
+    healthRange.addEventListener("input", () => {
+      state.health = Number(healthRange.value);
+      render();
+    });
+
+    document.getElementById("btn-headshot").addEventListener("click", () => applyHeadshot(40));
+    document.getElementById("btn-bodyshot").addEventListener("click", () => applyBodyshot(25));
+    document.getElementById("btn-reset").addEventListener("click", () => {
+      state.helmet = MAX.helmet;
+      state.armor = MAX.armor;
+      state.health = MAX.health;
+      render("Reset: helm/armor/health full.");
+    });
+
+    render();
+  </script>
+</body>
+</html>

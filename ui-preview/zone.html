@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WTBG Preview — Moving Zone</title>
+  <style>
+    :root {
+      --bg: #0b0e13;
+      --panel: rgba(10, 12, 18, 0.82);
+      --safe: rgba(232, 196, 48, 0.28);
+      --safe-edge: rgba(255, 220, 80, 0.95);
+      --ring: rgba(255, 255, 255, 0.92);
+      --storm: rgba(70, 120, 220, 0.22);
+      --danger: rgba(180, 40, 50, 0.18);
+      --ink: #f4f6fa;
+      --muted: rgba(244, 246, 250, 0.55);
+      --accent: #e8c430;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 0%, #1a2230 0%, transparent 45%),
+        radial-gradient(ellipse at 90% 100%, #141820 0%, transparent 40%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .stage {
+      width: min(1100px, 96vw);
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .stage { grid-template-columns: 1fr; }
+    }
+
+    .label {
+      grid-column: 1 / -1;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .map-shell {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: #05070b;
+      aspect-ratio: 16 / 11;
+      min-height: 420px;
+    }
+
+    /* Fake Los Santos-ish street grid */
+    .map {
+      position: absolute;
+      inset: 0;
+      background-color: #0a0d12;
+      background-image:
+        linear-gradient(rgba(120, 130, 145, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120, 130, 145, 0.12) 1px, transparent 1px),
+        linear-gradient(rgba(160, 170, 185, 0.18) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(160, 170, 185, 0.18) 1px, transparent 1px),
+        radial-gradient(circle at 35% 40%, rgba(40, 55, 70, 0.55), transparent 42%),
+        radial-gradient(circle at 70% 60%, rgba(35, 45, 60, 0.45), transparent 38%);
+      background-size:
+        28px 28px,
+        28px 28px,
+        112px 112px,
+        112px 112px,
+        100% 100%,
+        100% 100%;
+      filter: contrast(1.05) brightness(0.95);
+    }
+
+    .map::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 18%, rgba(180, 190, 205, 0.08) 18.2%, transparent 18.5%),
+        linear-gradient(0deg, transparent 42%, rgba(180, 190, 205, 0.07) 42.2%, transparent 42.6%),
+        linear-gradient(90deg, transparent 61%, rgba(180, 190, 205, 0.07) 61.3%, transparent 61.7%),
+        linear-gradient(0deg, transparent 68%, rgba(180, 190, 205, 0.06) 68.2%, transparent 68.6%);
+      pointer-events: none;
+    }
+
+    .zones {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    /* Storm / unsafe outside current white ring */
+    .storm {
+      position: absolute;
+      inset: -20%;
+      background:
+        radial-gradient(circle, transparent 0%, transparent 40%, var(--storm) 55%, rgba(20, 40, 90, 0.55) 100%),
+        repeating-linear-gradient(
+          -18deg,
+          transparent,
+          transparent 10px,
+          rgba(90, 140, 255, 0.05) 10px,
+          rgba(90, 140, 255, 0.05) 20px
+        );
+      transition: clip-path 80ms linear;
+      mix-blend-mode: screen;
+      opacity: 0.9;
+    }
+
+    .danger-tint {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle, transparent 35%, var(--danger) 100%);
+      opacity: 0.55;
+      pointer-events: none;
+      transition: clip-path 80ms linear;
+    }
+
+    .circle {
+      position: absolute;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      will-change: width, height, left, top;
+    }
+
+    /* Current boundary — garis putih */
+    .circle.current {
+      border: 2px solid var(--ring);
+      box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.35),
+        0 0 18px rgba(255, 255, 255, 0.15);
+      background: transparent;
+    }
+
+    /* Next / safe target — kuning semi transparan */
+    .circle.next {
+      background: var(--safe);
+      border: 2px solid var(--safe-edge);
+      box-shadow:
+        0 0 24px rgba(232, 196, 48, 0.25),
+        inset 0 0 40px rgba(255, 220, 80, 0.12);
+      animation: safePulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes safePulse {
+      0%, 100% { box-shadow: 0 0 18px rgba(232, 196, 48, 0.2), inset 0 0 30px rgba(255, 220, 80, 0.1); }
+      50% { box-shadow: 0 0 32px rgba(232, 196, 48, 0.38), inset 0 0 48px rgba(255, 220, 80, 0.16); }
+    }
+
+    .player {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff3b3b;
+      border: 2px solid #fff;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 10px rgba(255, 60, 60, 0.65);
+      z-index: 5;
+    }
+
+    .player::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: -10px;
+      width: 2px;
+      height: 8px;
+      background: #fff;
+      transform: translateX(-50%);
+      border-radius: 1px;
+    }
+
+    .crosshair {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0.35;
+    }
+
+    .crosshair::before,
+    .crosshair::after {
+      content: "";
+      position: absolute;
+      background: #fff;
+    }
+
+    .crosshair::before {
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      transform: translateX(-50%);
+    }
+
+    .crosshair::after {
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      transform: translateY(-50%);
+    }
+
+    .hud-top {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 6;
+      pointer-events: none;
+    }
+
+    .chip {
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .chip strong {
+      display: block;
+      font-size: 15px;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+    }
+
+    .chip.warn strong {
+      color: #ff6b6b;
+    }
+
+    .legend-float {
+      position: absolute;
+      left: 14px;
+      bottom: 14px;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 12px;
+    }
+
+    .legend-float span {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: rgba(244, 246, 250, 0.85);
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+    }
+
+    .swatch.safe {
+      background: rgba(232, 196, 48, 0.55);
+      border: 2px solid var(--safe-edge);
+    }
+
+    .swatch.ring {
+      background: transparent;
+      border: 2px solid #fff;
+    }
+
+    .swatch.storm {
+      background: rgba(70, 120, 220, 0.55);
+      border: 1px solid rgba(140, 180, 255, 0.6);
+    }
+
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .panel {
+      padding: 16px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .panel h2 {
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .stats {
+      display: grid;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .stats div {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .stats span { color: var(--muted); }
+    .stats b { font-variant-numeric: tabular-nums; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    button {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      font-size: 12px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    button:hover { background: rgba(255, 255, 255, 0.12); }
+    button.primary {
+      background: rgba(232, 196, 48, 0.18);
+      border-color: rgba(232, 196, 48, 0.45);
+      color: #ffe58a;
+    }
+
+    .note {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .timeline {
+      margin-top: 12px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .timeline > i {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #e8c430, #fff3a8);
+      transition: width 80ms linear;
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <p class="label">Preview · Zona bergerak (safe kuning · luar putih = berbahaya)</p>
+
+    <div class="map-shell" id="map-shell">
+      <div class="map"></div>
+      <div class="zones">
+        <div class="storm" id="storm"></div>
+        <div class="danger-tint" id="danger"></div>
+        <div class="circle next" id="next"></div>
+        <div class="circle current" id="current"></div>
+        <div class="crosshair" id="crosshair"></div>
+        <div class="player" id="player"></div>
+      </div>
+
+      <div class="hud-top">
+        <div class="chip" id="phase-chip">
+          Phase <strong id="phase-label">1 / 5</strong>
+        </div>
+        <div class="chip" id="timer-chip">
+          Next shrink
+          <strong id="timer-label">00:20</strong>
+        </div>
+      </div>
+
+      <div class="legend-float">
+        <span><i class="swatch safe"></i> Zona aman (kuning)</span>
+        <span><i class="swatch ring"></i> Batas sekarang (putih)</span>
+        <span><i class="swatch storm"></i> Di luar putih = tidak aman</span>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="panel">
+        <h2>Status zona</h2>
+        <div class="stats">
+          <div><span>Status</span><b id="status">Waiting</b></div>
+          <div><span>Radius current</span><b id="r-current">—</b></div>
+          <div><span>Radius safe</span><b id="r-next">—</b></div>
+          <div><span>Player</span><b id="player-state">In safe</b></div>
+        </div>
+        <div class="timeline"><i id="progress"></i></div>
+        <div class="actions">
+          <button type="button" class="primary" id="btn-start">Start phase</button>
+          <button type="button" id="btn-pause">Pause</button>
+          <button type="button" id="btn-reset">Reset</button>
+          <button type="button" id="btn-next">Skip to next</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Cara baca</h2>
+        <p class="note">
+          Area <b style="color:#e8c430">kuning</b> = zona aman berikutnya.
+          Di dalam garis <b>putih</b> masih hidup tanpa damage phase ini.
+          Di luar garis putih = storm / tidak aman.
+          Saat phase jalan, lingkaran putih mengecil &amp; bergeser ke zona kuning.
+        </p>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const shell = document.getElementById("map-shell");
+    const elCurrent = document.getElementById("current");
+    const elNext = document.getElementById("next");
+    const elStorm = document.getElementById("storm");
+    const elDanger = document.getElementById("danger");
+    const elPlayer = document.getElementById("player");
+    const elCross = document.getElementById("crosshair");
+
+    // Normalized coords 0..1 inside map
+    const phases = [
+      { wait: 8, move: 12, next: { x: 0.52, y: 0.48, r: 0.34 } },
+      { wait: 7, move: 11, next: { x: 0.58, y: 0.42, r: 0.24 } },
+      { wait: 6, move: 10, next: { x: 0.54, y: 0.46, r: 0.16 } },
+      { wait: 5, move: 9,  next: { x: 0.50, y: 0.50, r: 0.10 } },
+      { wait: 4, move: 8,  next: { x: 0.48, y: 0.52, r: 0.06 } },
+    ];
+
+    let current = { x: 0.50, y: 0.50, r: 0.46 };
+    let next = { ...phases[0].next };
+    let player = { x: 0.51, y: 0.49 };
+
+    let phaseIndex = 0;
+    let mode = "idle"; // idle | wait | move
+    let t0 = 0;
+    let duration = 0;
+    let from = null;
+    let running = false;
+    let raf = 0;
+
+    function size() {
+      return {
+        w: shell.clientWidth,
+        h: shell.clientHeight,
+      };
+    }
+
+    function toPx(circle) {
+      const { w, h } = size();
+      const min = Math.min(w, h);
+      return {
+        left: circle.x * w,
+        top: circle.y * h,
+        diameter: circle.r * 2 * min,
+      };
+    }
+
+    function placeCircle(el, circle) {
+      const p = toPx(circle);
+      el.style.left = `${p.left}px`;
+      el.style.top = `${p.top}px`;
+      el.style.width = `${p.diameter}px`;
+      el.style.height = `${p.diameter}px`;
+    }
+
+    function circleClip(circle) {
+      const { w, h } = size();
+      const min = Math.min(w, h);
+      const cx = circle.x * w;
+      const cy = circle.y * h;
+      const radius = circle.r * min;
+      // clip everything OUTSIDE the current white circle = storm visible outside
+      return `circle(${radius}px at ${cx}px ${cy}px)`;
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function lerpCircle(a, b, t) {
+      return {
+        x: lerp(a.x, b.x, t),
+        y: lerp(a.y, b.y, t),
+        r: lerp(a.r, b.r, t),
+      };
+    }
+
+    function easeInOut(t) {
+      return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    }
+
+    function distNorm(a, b) {
+      const { w, h } = size();
+      const min = Math.min(w, h);
+      const dx = (a.x - b.x) * w;
+      const dy = (a.y - b.y) * h;
+      return Math.hypot(dx, dy) / min;
+    }
+
+    function formatTime(sec) {
+      const s = Math.max(0, Math.ceil(sec));
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+    }
+
+    function updateStormMask(circle) {
+      // show storm OUTSIDE white ring: invert clip via mask trick
+      // We clip the "clear hole" then use a full overlay with mask-composite
+      const clip = circleClip(circle);
+      elStorm.style.clipPath = `path(evenodd, 'M -2000 -2000 H 4000 V 4000 H -2000 Z')`;
+      // fallback approach: use CSS mask
+      const { w, h } = size();
+      const min = Math.min(w, h);
+      const cx = circle.x * w;
+      const cy = circle.y * h;
+      const radius = circle.r * min;
+      const grad = `radial-gradient(circle ${radius}px at ${cx}px ${cy}px, transparent ${radius - 1}px, black ${radius}px)`;
+      elStorm.style.webkitMaskImage = grad;
+      elStorm.style.maskImage = grad;
+      elDanger.style.webkitMaskImage = grad;
+      elDanger.style.maskImage = grad;
+    }
+
+    function renderHud(remain, progress) {
+      document.getElementById("phase-label").textContent = `${phaseIndex + 1} / ${phases.length}`;
+      document.getElementById("timer-label").textContent = formatTime(remain);
+      document.getElementById("status").textContent =
+        mode === "wait" ? "Waiting to shrink" :
+        mode === "move" ? "Zone moving" :
+        running ? "Running" : "Idle";
+
+      const { w, h } = size();
+      const min = Math.min(w, h);
+      document.getElementById("r-current").textContent = `${Math.round(current.r * min)} px`;
+      document.getElementById("r-next").textContent = `${Math.round(next.r * min)} px`;
+      document.getElementById("progress").style.width = `${Math.round(progress * 100)}%`;
+
+      const d = distNorm(player, current);
+      const outside = d > current.r;
+      const inSafe = distNorm(player, next) <= next.r;
+      const playerEl = document.getElementById("player-state");
+      const timerChip = document.getElementById("timer-chip");
+
+      if (outside) {
+        playerEl.textContent = "IN STORM";
+        playerEl.style.color = "#ff6b6b";
+        timerChip.classList.add("warn");
+      } else if (inSafe) {
+        playerEl.textContent = "In safe zone";
+        playerEl.style.color = "#e8c430";
+        timerChip.classList.remove("warn");
+      } else {
+        playerEl.textContent = "Safe for now · move inward";
+        playerEl.style.color = "#fff";
+        timerChip.classList.remove("warn");
+      }
+    }
+
+    function draw() {
+      placeCircle(elCurrent, current);
+      placeCircle(elNext, next);
+      updateStormMask(current);
+
+      const { w, h } = size();
+      elPlayer.style.left = `${player.x * w}px`;
+      elPlayer.style.top = `${player.y * h}px`;
+      elCross.style.left = `${player.x * w}px`;
+      elCross.style.top = `${player.y * h}px`;
+    }
+
+    function startWait() {
+      mode = "wait";
+      duration = phases[phaseIndex].wait;
+      t0 = performance.now();
+      next = { ...phases[phaseIndex].next };
+      draw();
+    }
+
+    function startMove() {
+      mode = "move";
+      duration = phases[phaseIndex].move;
+      t0 = performance.now();
+      from = { ...current };
+      draw();
+    }
+
+    function advancePhase() {
+      if (phaseIndex >= phases.length - 1 && mode === "move") {
+        current = { ...next };
+        mode = "idle";
+        running = false;
+        renderHud(0, 1);
+        draw();
+        return;
+      }
+
+      if (mode === "move") {
+        current = { ...next };
+        if (phaseIndex < phases.length - 1) {
+          phaseIndex += 1;
+          startWait();
+        } else {
+          mode = "idle";
+          running = false;
+        }
+      } else {
+        startMove();
+      }
+    }
+
+    function tick(now) {
+      if (!running) return;
+
+      const elapsed = (now - t0) / 1000;
+      const t = Math.min(1, elapsed / duration);
+
+      if (mode === "move" && from) {
+        current = lerpCircle(from, next, easeInOut(t));
+      }
+
+      // subtle player drift toward safe center while demo runs
+      if (mode === "move" || mode === "wait") {
+        player.x = lerp(player.x, next.x + 0.01, 0.004);
+        player.y = lerp(player.y, next.y - 0.005, 0.004);
+      }
+
+      draw();
+      renderHud(duration - elapsed, mode === "wait" || mode === "move" ? t : 0);
+
+      if (t >= 1) {
+        if (mode === "wait") startMove();
+        else advancePhase();
+      }
+
+      raf = requestAnimationFrame(tick);
+    }
+
+    function start() {
+      if (running) return;
+      running = true;
+      if (mode === "idle") {
+        phaseIndex = Math.min(phaseIndex, phases.length - 1);
+        startWait();
+      }
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(tick);
+    }
+
+    function pause() {
+      running = false;
+      cancelAnimationFrame(raf);
+      document.getElementById("status").textContent = "Paused";
+    }
+
+    function reset() {
+      pause();
+      phaseIndex = 0;
+      mode = "idle";
+      current = { x: 0.50, y: 0.50, r: 0.46 };
+      next = { ...phases[0].next };
+      player = { x: 0.51, y: 0.49 };
+      draw();
+      renderHud(phases[0].wait, 0);
+      document.getElementById("status").textContent = "Idle";
+    }
+
+    function skip() {
+      if (!running && mode === "idle") start();
+      t0 = performance.now() - duration * 1000;
+    }
+
+    document.getElementById("btn-start").addEventListener("click", start);
+    document.getElementById("btn-pause").addEventListener("click", pause);
+    document.getElementById("btn-reset").addEventListener("click", reset);
+    document.getElementById("btn-next").addEventListener("click", skip);
+
+    // Click map to place player
+    shell.addEventListener("click", (e) => {
+      const rect = shell.getBoundingClientRect();
+      player.x = (e.clientX - rect.left) / rect.width;
+      player.y = (e.clientY - rect.top) / rect.height;
+      draw();
+      renderHud(0, 0);
+    });
+
+    window.addEventListener("resize", () => {
+      draw();
+    });
+
+    reset();
+  </script>
+</body>
+</html>
