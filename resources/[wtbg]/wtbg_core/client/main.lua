@@ -152,6 +152,19 @@ RegisterNetEvent('wtbg:core:notify', function(message)
     })
 end)
 
+RegisterNetEvent('wtbg:core:setVitals', function(health, armor)
+    local ped = PlayerPedId()
+    if not ped or ped == 0 then
+        return
+    end
+    if type(health) == 'number' then
+        SetEntityHealth(ped, health)
+    end
+    if type(armor) == 'number' then
+        SetPedArmour(ped, armor)
+    end
+end)
+
 AddEventHandler('playerSpawned', function()
     CreateThread(function()
         Wait(0)

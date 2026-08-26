@@ -24,6 +24,7 @@ local function snapshot(match)
             source = member.source,
             teamId = member.teamId,
             alive = member.alive,
+            downed = member.downed == true,
             kills = member.kills,
             placement = member.placement,
             name = member.name
@@ -71,10 +72,14 @@ local function foreachMember(match, fn)
     end
 end
 
+local function isStanding(member)
+    return member and member.alive == true and member.downed ~= true
+end
+
 local function recountAlive(match)
     local n = 0
     for _, member in pairs(match.players) do
-        if member.alive then
+        if isStanding(member) then
             n = n + 1
         end
     end
@@ -85,21 +90,54 @@ end
 local function recountAliveTeams(match)
     local n = 0
     for _, team in pairs(match.teams) do
-        local alive = 0
+        local standing = 0
         for src, _ in pairs(team.players) do
-            local member = match.players[src]
-            if member and member.alive then
-                alive = alive + 1
+            if isStanding(match.players[src]) then
+                standing = standing + 1
             end
         end
-        team.alivePlayers = alive
-        team.eliminated = alive <= 0
+        team.alivePlayers = standing
+        team.eliminated = standing <= 0
         if not team.eliminated then
             n = n + 1
         end
     end
     match.aliveTeams = n
     return n
+end
+
+local function creditKill(match, killerSource)
+    killerSource = tonumber(killerSource)
+    if not match or not killerSource then
+        return false
+    end
+
+    local killerMember = match.players[killerSource]
+    if not killerMember then
+        return false
+    end
+
+    killerMember.kills = (killerMember.kills or 0) + 1
+    local team = match.teams[killerMember.teamId]
+    if team then
+        team.kills = (team.kills or 0) + 1
+    end
+    return true
+end
+
+local function creditDownedTeam(match, team)
+    if not team then
+        return
+    end
+
+    for src, _ in pairs(team.players) do
+        local mate = match.players[src]
+        if mate and mate.downed and mate.downedBy and not mate.killCredited then
+            if creditKill(match, mate.downedBy) then
+                mate.killCredited = true
+            end
+        end
+    end
 end
 
 local function pushHistory(entry)
@@ -137,7 +175,8 @@ local function squadList(match, member)
             list[#list + 1] = {
                 source = src,
                 name = mate.name,
-                alive = mate.alive == true
+                alive = mate.alive == true,
+                downed = mate.downed == true
             }
         end
     end
@@ -219,6 +258,9 @@ local function addMember(match, source, teamId)
         source = source,
         teamId = teamId,
         alive = true,
+        downed = false,
+        downedBy = nil,
+        killCredited = false,
         kills = 0,
         placement = nil,
         spawnIndex = nil,
@@ -267,6 +309,7 @@ local function destroyMatch(matchId)
     end
 
     matches[matchId] = nil
+    TriggerEvent('wtbg:match:destroyed', matchId)
     WTBG.Debug('destroyed match', matchId)
     return true
 end
@@ -345,6 +388,7 @@ local function finishMatch(match)
 
     match.state = WTBG.MatchStates.FINISHED
     findWinner(match)
+    TriggerEvent('wtbg:match:serverFinished', match.id)
 
     foreachMember(match, function(source)
         exports.wtbg_core:SetSessionState(source, WTBG.PlayerStates.RESULT)
@@ -378,13 +422,14 @@ local function finishMatch(match)
     return true
 end
 
-local function markEliminated(match, source)
+local function markEliminated(match, source, killer)
     local member = match.players[source]
     if not member or not member.alive then
         return false
     end
 
     member.alive = false
+    member.downed = false
     exports.wtbg_core:SetAlive(source, false)
     exports.wtbg_core:SetSessionState(source, WTBG.PlayerStates.DEAD)
 
@@ -401,13 +446,28 @@ local function markEliminated(match, source)
         member.placement = match.alivePlayers + 1
     end
 
+    TriggerEvent('wtbg:match:playerEliminated', source, match.id, match.state, tonumber(killer))
+
     return true
+end
+
+local function useDrop(match)
+    if GetResourceState('wtbg_drop') ~= 'started' then
+        return false
+    end
+    local ok, uses = pcall(function()
+        return exports.wtbg_drop:UsesMatch(match.id)
+    end)
+    return ok and uses == true
 end
 
 local function preparePlayer(match, source, member)
     local spawn, spawnIndex = pickSpawn(match)
     member.spawnIndex = spawnIndex
     member.alive = true
+    member.downed = false
+    member.downedBy = nil
+    member.killCredited = false
     member.placement = nil
 
     SetPlayerRoutingBucket(source, match.bucket)
@@ -415,9 +475,14 @@ local function preparePlayer(match, source, member)
     exports.wtbg_core:SetAlive(source, true)
     exports.wtbg_core:SetSessionState(source, WTBG.PlayerStates.MATCH)
 
-    TriggerClientEvent('wtbg:match:enter', source, spawn, Config.StartCountdown)
     TriggerClientEvent('wtbg:match:setTeam', source, member.teamId, Config.FriendlyFire and true or false)
     TriggerClientEvent('wtbg:ui:showMatch', source, hudPayload(match, member))
+
+    if useDrop(match) then
+        return
+    end
+
+    TriggerClientEvent('wtbg:match:enter', source, spawn, Config.StartCountdown)
 end
 
 local function abortStart(match)
@@ -726,6 +791,8 @@ function WTBG.Match.Start(source, matchId)
         preparePlayer(match, src, member)
     end)
 
+    TriggerEvent('wtbg:match:starting', match.id, match.bucket)
+
     local id = match.id
     SetTimeout(Config.StartCountdown * 1000, function()
         local current = matches[id]
@@ -743,11 +810,14 @@ function WTBG.Match.Start(source, matchId)
         current.startedAt = os.time()
         recountAlive(current)
         recountAliveTeams(current)
+        TriggerEvent('wtbg:match:becameActive', current.id, current.bucket)
 
         foreachMember(current, function(src, member)
-            pcall(function()
-                TriggerEvent('wtbg:match:applyLoadout', src)
-            end)
+            if not useDrop(current) then
+                pcall(function()
+                    TriggerEvent('wtbg:match:applyLoadout', src)
+                end)
+            end
             TriggerClientEvent('wtbg:match:begin', src)
             TriggerClientEvent('wtbg:match:setTeam', src, member.teamId, Config.FriendlyFire and true or false)
             TriggerClientEvent('wtbg:ui:hud', src, hudPayload(current, member))
@@ -760,7 +830,7 @@ function WTBG.Match.Start(source, matchId)
     return true, nil
 end
 
-function WTBG.Match.ReportDeath(victim, killer, weapon)
+function WTBG.Match.ReportDeath(victim, killer, weapon, kind)
     victim = tonumber(victim)
     killer = tonumber(killer)
 
@@ -773,7 +843,11 @@ function WTBG.Match.ReportDeath(victim, killer, weapon)
         return false, nil
     end
 
-    if player.state ~= WTBG.PlayerStates.MATCH or not player.alive then
+    if not player.alive then
+        return false, nil
+    end
+
+    if player.state ~= WTBG.PlayerStates.MATCH and player.state ~= WTBG.PlayerStates.KNOCKED then
         return false, nil
     end
 
@@ -788,27 +862,24 @@ function WTBG.Match.ReportDeath(victim, killer, weapon)
     end
 
     local killerMember = killer and match.players[killer] or nil
-    if killer and killer ~= victim and killerMember then
+    if member.killCredited then
+        killerMember = killer and match.players[killer] or killerMember
+    elseif killer and killer ~= victim and killerMember then
         local sameTeam = member.teamId ~= nil and member.teamId == killerMember.teamId
-        if sameTeam and not Config.FriendlyFire then
-            killer = nil
-            killerMember = nil
-        elseif sameTeam then
+        if sameTeam then
             killer = nil
             killerMember = nil
         else
-            killerMember.kills = (killerMember.kills or 0) + 1
-            local team = match.teams[killerMember.teamId]
-            if team then
-                team.kills = (team.kills or 0) + 1
-            end
+            creditKill(match, killer)
+            member.killCredited = true
+            member.downedBy = killer
         end
     else
         killer = nil
         killerMember = nil
     end
 
-    markEliminated(match, victim)
+    markEliminated(match, victim, killer)
 
     local info = {
         matchId = match.id,
@@ -825,7 +896,8 @@ function WTBG.Match.ReportDeath(victim, killer, weapon)
     updateHud(match)
     broadcast(match, 'wtbg:ui:killfeed', {
         killer = info.killerName,
-        victim = info.victimName
+        victim = info.victimName,
+        kind = kind or 'kill'
     })
 
     TriggerClientEvent('wtbg:match:playerDied', victim)
@@ -922,6 +994,104 @@ function WTBG.Match.List()
     return list
 end
 
+function WTBG.Match.SetDowned(source, downed, killer)
+    source = tonumber(source)
+    if not source then
+        return false
+    end
+
+    local player = exports.wtbg_core:GetPlayerState(source)
+    if not player or not player.matchId then
+        return false
+    end
+
+    local match = getMatch(player.matchId)
+    if not match then
+        return false
+    end
+
+    local member = match.players[source]
+    if not member or not member.alive then
+        return false
+    end
+
+    member.downed = downed and true or false
+    if member.downed then
+        member.downedBy = tonumber(killer)
+        TriggerEvent('wtbg:match:playerDowned', source, match.id)
+    else
+        member.downedBy = nil
+    end
+
+    recountAlive(match)
+    recountAliveTeams(match)
+
+    if member.downed then
+        local team = match.teams[member.teamId]
+        if team and team.eliminated then
+            if not team.placement then
+                team.placement = match.aliveTeams + 1
+                member.placement = team.placement
+            end
+            creditDownedTeam(match, team)
+        end
+    end
+
+    updateHud(match)
+
+    if member.downed and match.state == WTBG.MatchStates.ACTIVE and shouldEnd(match) then
+        finishMatch(match)
+    end
+
+    return true
+end
+
+function WTBG.Match.GetMember(source)
+    source = tonumber(source)
+    if not source then
+        return nil
+    end
+
+    local player = exports.wtbg_core:GetPlayerState(source)
+    if not player or not player.matchId then
+        return nil
+    end
+
+    local match = getMatch(player.matchId)
+    if not match then
+        return nil
+    end
+
+    local member = match.players[source]
+    if not member then
+        return nil
+    end
+
+    return {
+        matchId = match.id,
+        matchState = match.state,
+        mode = match.mode,
+        bucket = match.bucket,
+        teamId = member.teamId,
+        alive = member.alive == true,
+        downed = member.downed == true,
+        name = member.name
+    }
+end
+
+function WTBG.Match.GetMatchSources(matchId)
+    local match = getMatch(tonumber(matchId))
+    if not match then
+        return {}
+    end
+
+    local list = {}
+    for src, _ in pairs(match.players) do
+        list[#list + 1] = tonumber(src)
+    end
+    return list
+end
+
 AddEventHandler('wtbg:core:playerDropped', function(source, state)
     WTBG.Match.HandleDisconnect(source, state)
 end)
@@ -972,8 +1142,20 @@ exports('StartMatch', function(source, matchId)
     return WTBG.Match.Start(source, matchId)
 end)
 
-exports('ReportDeath', function(victim, killer, weapon)
-    return WTBG.Match.ReportDeath(victim, killer, weapon)
+exports('ReportDeath', function(victim, killer, weapon, kind)
+    return WTBG.Match.ReportDeath(victim, killer, weapon, kind)
+end)
+
+exports('SetDowned', function(source, downed, killer)
+    return WTBG.Match.SetDowned(tonumber(source), downed, killer)
+end)
+
+exports('GetMember', function(source)
+    return WTBG.Match.GetMember(tonumber(source))
+end)
+
+exports('GetMatchSources', function(matchId)
+    return WTBG.Match.GetMatchSources(matchId)
 end)
 
 exports('ListMatches', function()

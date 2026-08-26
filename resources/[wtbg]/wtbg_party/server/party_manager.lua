@@ -24,6 +24,7 @@ local function fighting(source)
     end
 
     return state.state == WTBG.PlayerStates.MATCH
+        or state.state == WTBG.PlayerStates.KNOCKED
         or state.state == WTBG.PlayerStates.DEAD
         or state.state == WTBG.PlayerStates.RESULT
 end

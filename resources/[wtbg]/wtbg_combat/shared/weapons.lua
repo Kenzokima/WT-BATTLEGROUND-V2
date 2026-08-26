@@ -34,9 +34,9 @@ function Weapons.ApplyLoadout(ped)
     local health = Config.StartingHealth or 200
     if not IsDuplicityVersion() then
         SetPedMaxHealth(ped, health)
+        SetEntityMaxHealth(ped, health)
+        SetEntityHealth(ped, health)
+        SetPedArmour(ped, Config.StartingArmor or 0)
     end
-    SetEntityMaxHealth(ped, health)
-    SetEntityHealth(ped, health)
-    SetPedArmour(ped, Config.StartingArmor or 0)
     return true
 end
