@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WTBG Preview — Crew compact (kiri, max 10)</title>
+  <style>
+    :root {
+      --panel: rgba(12, 14, 20, 0.52);
+      --track: rgba(0, 0, 0, 0.4);
+      --health: #3fd13a;
+      --armor: #3db7ff;
+      --ink: #ffffff;
+      --muted: rgba(255, 255, 255, 0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 20% 10%, #3a4658 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, #243044 0%, transparent 45%),
+        #1a1d24;
+      padding: 24px;
+    }
+
+    .stage { width: min(980px, 96vw); }
+
+    .label {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .screen {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background:
+        linear-gradient(180deg, rgba(20, 28, 36, 0.15), rgba(8, 10, 14, 0.45)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 56px),
+        #151a22;
+    }
+
+    .screen::before {
+      content: "Center view tetap terbuka · crew di kiri atas (compact)";
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.32);
+      white-space: nowrap;
+    }
+
+    /* Safe center zone indicator */
+    .safe-zone {
+      position: absolute;
+      left: 28%;
+      right: 18%;
+      top: 18%;
+      bottom: 22%;
+      border: 1px dashed rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    /* Minimap + vitals (bottom-left) — crew jangan tabrakan sini */
+    .minimap {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      width: 140px;
+      height: 104px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: #0a1018;
+    }
+
+    .vitals-mock {
+      position: absolute;
+      left: 16px;
+      bottom: 128px;
+      width: 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .vitals-mock i {
+      display: block;
+      height: 10px;
+      border-radius: 2px;
+      background: #5fd12e;
+    }
+
+    .vitals-mock i:first-child {
+      height: 8px;
+      width: 70%;
+      background: #1a3a6e;
+    }
+
+    /* ===== Compact crew — kiri atas ===== */
+    .crew {
+      position: absolute;
+      top: 16px;
+      left: 14px;
+      width: min(210px, 22vw);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: calc(100% - 160px); /* sisakan ruang minimap/vitals */
+      overflow: hidden;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .member {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 5px;
+      align-items: center;
+      padding: 3px 5px 3px 3px;
+      border-radius: 5px;
+      background: var(--panel);
+      backdrop-filter: blur(2px);
+    }
+
+    .member.is-dead {
+      opacity: 0.38;
+      filter: grayscale(0.4);
+    }
+
+    .member.is-dead .bars {
+      display: none; /* hemat ruang saat mati */
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+      background: #2a2436;
+    }
+
+    .avatar .fallback {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: rgba(255, 255, 255, 0.8);
+      background: linear-gradient(160deg, #3a4658, #1e2430);
+    }
+
+    .avatar .slot {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 12px;
+      height: 12px;
+      font-size: 8px;
+      font-weight: 800;
+      color: #111;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+    }
+
+    .mid {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .name {
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+      line-height: 1.1;
+    }
+
+    .bars {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .bar {
+      height: 4px;
+      border-radius: 1px;
+      background: var(--track);
+      overflow: hidden;
+    }
+
+    .bar.armor { height: 3px; }
+    .bar > i {
+      display: block;
+      height: 100%;
+      width: 0%;
+      transition: width 140ms linear;
+    }
+    .bar.armor > i { background: var(--armor); }
+    .bar.health > i { background: var(--health); }
+    .bar.is-hidden { display: none; }
+
+    .c1 { background: #e23b3b; }
+    .c2 { background: #e6c12e; }
+    .c3 { background: #7fd63a; }
+    .c4 { background: #8a4fd6; }
+    .c5 { background: #e88a2a; }
+    .c6 { background: #3b78e0; }
+    .c7 { background: #e35aa8; }
+    .c8 { background: #efefef; }
+    .c9 { background: #45c4c4; }
+    .c10 { background: #c4a15a; }
+
+    .panel {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.28);
+    }
+
+    .panel h2 {
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover { background: rgba(255, 255, 255, 0.12); }
+
+    .note {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .count {
+      font-variant-numeric: tabular-nums;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <p class="label">Preview · Crew compact kiri atas · dinamis sampai 10</p>
+
+    <div class="screen">
+      <div class="safe-zone"></div>
+      <div class="crew" id="crew"></div>
+      <div class="vitals-mock" aria-hidden="true"><i></i><i></i></div>
+      <div class="minimap"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Simulasi anggota · <span class="count" id="count">0</span> / 10</h2>
+      <div class="actions">
+        <button type="button" id="btn-add">+ Tambah member</button>
+        <button type="button" id="btn-remove">− Hapus terakhir</button>
+        <button type="button" id="btn-damage">Random damage</button>
+        <button type="button" id="btn-fill10">Isi 10 orang</button>
+        <button type="button" id="btn-reset">Reset 4</button>
+      </div>
+      <p class="note">
+        Bisa diimplement. Desain ini sengaja compact supaya 10 orang tidak menutupi
+        view tengah: kartu tipis (~32px), lebar ~210px, kiri atas (jauh dari minimap/vitals),
+        transparan, dan bar HP/armor hilang otomatis kalau member mati.
+        Data dinamis: list hanya render member yang ada (bukan 10 slot kosong).
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const COLORS = ["c1","c2","c3","c4","c5","c6","c7","c8","c9","c10"];
+    const NAMES = [
+      "Jonathanuop", "SlimBarnacle", "WT.Reza", "Kenzo", "NovaFox",
+      "Tiger_06", "ShadowX", "Lansky", "agus123", "Cr1lots"
+    ];
+
+    let members = NAMES.slice(0, 10).map((name, i) => ({
+      name,
+      armor: [0, 50, 100, 35, 80, 20, 90, 60, 15, 70][i],
+      health: [28, 96, 100, 70, 85, 45, 100, 55, 100, 72][i],
+      alive: true,
+    }));
+
+    function clamp(n, min, max) {
+      return Math.max(min, Math.min(max, Number(n) || 0));
+    }
+
+    function escapeHtml(v) {
+      return String(v)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function card(m, i) {
+      const dead = !m.alive || m.health <= 0;
+      const armor = clamp(m.armor, 0, 100);
+      const health = clamp(m.health, 0, 100);
+      const hideArmor = armor <= 0;
+      const initial = (m.name || "?").trim().slice(0, 1).toUpperCase();
+
+      return `
+        <article class="member${dead ? " is-dead" : ""}">
+          <div class="avatar">
+            <div class="fallback">${escapeHtml(initial)}</div>
+            <span class="slot ${COLORS[i]}">${i + 1}</span>
+          </div>
+          <div class="mid">
+            <div class="name">${escapeHtml(m.name)}</div>
+            <div class="bars">
+              <div class="bar armor${hideArmor ? " is-hidden" : ""}"><i style="width:${armor}%"></i></div>
+              <div class="bar health"><i style="width:${health}%"></i></div>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function render() {
+      document.getElementById("crew").innerHTML = members.map(card).join("");
+      document.getElementById("count").textContent = String(members.length);
+    }
+
+    document.getElementById("btn-add").addEventListener("click", () => {
+      if (members.length >= 10) return;
+      const i = members.length;
+      members.push({
+        name: NAMES[i] || `Player_${i + 1}`,
+        armor: 60 + Math.floor(Math.random() * 40),
+        health: 70 + Math.floor(Math.random() * 30),
+        alive: true,
+      });
+      render();
+    });
+
+    document.getElementById("btn-remove").addEventListener("click", () => {
+      members.pop();
+      render();
+    });
+
+    document.getElementById("btn-damage").addEventListener("click", () => {
+      members.forEach((m) => {
+        if (!m.alive) return;
+        let left = 10 + Math.floor(Math.random() * 35);
+        if (m.armor > 0) {
+          const taken = Math.min(m.armor, left);
+          m.armor -= taken;
+          left -= taken;
+        }
+        if (left > 0) m.health = clamp(m.health - left, 0, 100);
+        if (m.health <= 0) m.alive = false;
+      });
+      render();
+    });
+
+    document.getElementById("btn-fill10").addEventListener("click", () => {
+      while (members.length < 10) {
+        const i = members.length;
+        members.push({
+          name: NAMES[i] || `Player_${i + 1}`,
+          armor: Math.floor(Math.random() * 100),
+          health: 40 + Math.floor(Math.random() * 60),
+          alive: true,
+        });
+      }
+      render();
+    });
+
+    document.getElementById("btn-reset").addEventListener("click", () => {
+      members = NAMES.slice(0, 4).map((name) => ({
+        name,
+        armor: 100,
+        health: 100,
+        alive: true,
+      }));
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
