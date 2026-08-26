@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WTBG Preview — Crew mini (solusi ukuran)</title>
+  <style>
+    :root {
+      --panel: rgba(10, 12, 16, 0.42);
+      --track: rgba(0, 0, 0, 0.45);
+      --health: #3fd13a;
+      --armor: #3db7ff;
+      --ink: #ffffff;
+      --muted: rgba(255, 255, 255, 0.5);
+      --crew-w: 156px;
+      --row-pad: 2px;
+      --gap: 2px;
+      --avatar: 18px;
+      --name: 10px;
+      --bar-h: 2px;
+      --armor-h: 2px;
+      --slot: 9px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 20% 10%, #3a4658 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, #243044 0%, transparent 45%),
+        #1a1d24;
+      padding: 24px;
+    }
+
+    .stage { width: min(980px, 96vw); }
+
+    .label {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .screen {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background:
+        linear-gradient(180deg, rgba(20, 28, 36, 0.15), rgba(8, 10, 14, 0.45)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 56px),
+        #151a22;
+    }
+
+    .hint {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.32);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .safe-zone {
+      position: absolute;
+      left: 24%;
+      right: 16%;
+      top: 16%;
+      bottom: 20%;
+      border: 1px dashed rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .minimap {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      width: 140px;
+      height: 104px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: #0a1018;
+    }
+
+    .vitals-mock {
+      position: absolute;
+      left: 16px;
+      bottom: 128px;
+      width: 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .vitals-mock i {
+      display: block;
+      height: 10px;
+      border-radius: 2px;
+      background: #5fd12e;
+    }
+
+    .vitals-mock i:first-child {
+      height: 8px;
+      width: 70%;
+      background: #1a3a6e;
+    }
+
+    /* Crew */
+    .crew {
+      position: absolute;
+      top: 12px;
+      left: 10px;
+      width: var(--crew-w);
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+      max-height: calc(100% - 150px);
+      overflow: hidden;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .member {
+      display: grid;
+      grid-template-columns: var(--avatar) 1fr;
+      gap: 4px;
+      align-items: center;
+      padding: var(--row-pad) 4px var(--row-pad) 2px;
+      border-radius: 3px;
+      background: var(--panel);
+    }
+
+    .member.is-dead { opacity: 0.34; filter: grayscale(0.45); }
+    .member.is-dead .bars { display: none; }
+
+    .avatar {
+      width: var(--avatar);
+      height: var(--avatar);
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+      background: #2a2436;
+    }
+
+    .avatar .fallback {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      font-size: calc(var(--avatar) * 0.45);
+      font-weight: 800;
+      color: rgba(255, 255, 255, 0.85);
+      background: linear-gradient(160deg, #3a4658, #1e2430);
+    }
+
+    .avatar .slot {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      min-width: var(--slot);
+      height: var(--slot);
+      padding: 0 1px;
+      font-size: calc(var(--slot) * 0.78);
+      font-weight: 800;
+      color: #111;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+    }
+
+    .mid {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .name {
+      font-size: var(--name);
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+      line-height: 1.05;
+    }
+
+    .bars {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .bar {
+      height: var(--bar-h);
+      border-radius: 1px;
+      background: var(--track);
+      overflow: hidden;
+    }
+
+    .bar.armor { height: var(--armor-h); }
+    .bar > i {
+      display: block;
+      height: 100%;
+      width: 0%;
+    }
+    .bar.armor > i { background: var(--armor); }
+    .bar.health > i { background: var(--health); }
+    .bar.is-hidden { display: none; }
+
+    /* Mode: no avatar — even thinner footprint */
+    .crew.mode-slim .member {
+      grid-template-columns: 12px 1fr;
+      gap: 4px;
+    }
+
+    .crew.mode-slim .avatar {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: transparent;
+    }
+
+    .crew.mode-slim .avatar .fallback { display: none; }
+    .crew.mode-slim .avatar .slot {
+      position: static;
+      width: 12px;
+      height: 12px;
+      min-width: 12px;
+      border-radius: 2px;
+      font-size: 8px;
+    }
+
+    .c1 { background: #e23b3b; }
+    .c2 { background: #e6c12e; }
+    .c3 { background: #7fd63a; }
+    .c4 { background: #8a4fd6; }
+    .c5 { background: #e88a2a; }
+    .c6 { background: #3b78e0; }
+    .c7 { background: #e35aa8; }
+    .c8 { background: #efefef; }
+    .c9 { background: #45c4c4; }
+    .c10 { background: #c4a15a; }
+
+    .panel {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.28);
+    }
+
+    .panel h2 {
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .sizes, .modes, .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover { background: rgba(255, 255, 255, 0.12); }
+    button.is-on {
+      background: rgba(232, 196, 48, 0.18);
+      border-color: rgba(232, 196, 48, 0.45);
+      color: #ffe58a;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: #d7dde6;
+      margin-bottom: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .note {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <p class="label">Preview · solusi ukuran crew (lebih kecil, kurang menghalangi)</p>
+
+    <div class="screen">
+      <p class="hint" id="hint">Mini · 10 player · view tengah tetap terbuka</p>
+      <div class="safe-zone"></div>
+      <div class="crew mode-slim" id="crew"></div>
+      <div class="vitals-mock" aria-hidden="true"><i></i><i></i></div>
+      <div class="minimap"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Pilih ukuran</h2>
+      <div class="sizes">
+        <button type="button" data-size="old">Lama (~210px)</button>
+        <button type="button" data-size="small">Small</button>
+        <button type="button" class="is-on" data-size="mini">Mini (rekomendasi)</button>
+      </div>
+
+      <h2>Style baris</h2>
+      <div class="modes">
+        <button type="button" data-mode="card">Dengan avatar</button>
+        <button type="button" class="is-on" data-mode="slim">Slim (angka saja)</button>
+      </div>
+
+      <p class="meta" id="meta">—</p>
+
+      <div class="actions">
+        <button type="button" id="btn-damage">Random damage</button>
+        <button type="button" id="btn-reset">Reset HP full</button>
+      </div>
+
+      <p class="note">
+        Solusi: perkecil lebar + tinggi baris, transparan lebih kuat, dan mode
+        <b>Slim</b> (tanpa avatar besar — cuma nomor warna + nama + bar tipis).
+        Default preview ini pakai <b>Mini + Slim</b> supaya 10 orang tetap kecil di kiri.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const COLORS = ["c1","c2","c3","c4","c5","c6","c7","c8","c9","c10"];
+    const NAMES = [
+      "Jonathanuop", "SlimBarnacle", "WT.Reza", "Kenzo", "NovaFox",
+      "Tiger_06", "ShadowX", "Lansky", "agus123", "Cr1lots"
+    ];
+
+    const SIZES = {
+      old: {
+        "--crew-w": "210px",
+        "--row-pad": "3px",
+        "--gap": "4px",
+        "--avatar": "28px",
+        "--name": "11px",
+        "--bar-h": "4px",
+        "--armor-h": "3px",
+        "--slot": "12px",
+        label: "Lama ~210×32px/row",
+      },
+      small: {
+        "--crew-w": "176px",
+        "--row-pad": "2px",
+        "--gap": "3px",
+        "--avatar": "22px",
+        "--name": "10px",
+        "--bar-h": "3px",
+        "--armor-h": "2px",
+        "--slot": "10px",
+        label: "Small ~176×26px/row",
+      },
+      mini: {
+        "--crew-w": "148px",
+        "--row-pad": "1px",
+        "--gap": "2px",
+        "--avatar": "18px",
+        "--name": "9px",
+        "--bar-h": "2px",
+        "--armor-h": "2px",
+        "--slot": "9px",
+        label: "Mini ~148×20px/row",
+      },
+    };
+
+    let size = "mini";
+    let mode = "slim";
+
+    const members = NAMES.map((name, i) => ({
+      name,
+      armor: [0, 50, 100, 35, 80, 20, 90, 60, 15, 70][i],
+      health: [28, 96, 100, 70, 85, 45, 100, 55, 100, 72][i],
+      alive: true,
+    }));
+
+    function clamp(n, min, max) {
+      return Math.max(min, Math.min(max, Number(n) || 0));
+    }
+
+    function escapeHtml(v) {
+      return String(v)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function applySize() {
+      const conf = SIZES[size];
+      const root = document.documentElement;
+      Object.entries(conf).forEach(([k, v]) => {
+        if (k.startsWith("--")) root.style.setProperty(k, v);
+      });
+      document.querySelectorAll("[data-size]").forEach((btn) => {
+        btn.classList.toggle("is-on", btn.dataset.size === size);
+      });
+      document.getElementById("meta").textContent =
+        `${conf.label} · mode ${mode} · 10 / 10`;
+      document.getElementById("hint").textContent =
+        `${size.toUpperCase()} + ${mode.toUpperCase()} · 10 player · view tengah tetap terbuka`;
+    }
+
+    function applyMode() {
+      const crew = document.getElementById("crew");
+      crew.classList.toggle("mode-slim", mode === "slim");
+      document.querySelectorAll("[data-mode]").forEach((btn) => {
+        btn.classList.toggle("is-on", btn.dataset.mode === mode);
+      });
+      applySize();
+    }
+
+    function card(m, i) {
+      const dead = !m.alive || m.health <= 0;
+      const armor = clamp(m.armor, 0, 100);
+      const health = clamp(m.health, 0, 100);
+      const hideArmor = armor <= 0;
+      const initial = (m.name || "?").trim().slice(0, 1).toUpperCase();
+
+      return `
+        <article class="member${dead ? " is-dead" : ""}">
+          <div class="avatar">
+            <div class="fallback">${escapeHtml(initial)}</div>
+            <span class="slot ${COLORS[i]}">${i + 1}</span>
+          </div>
+          <div class="mid">
+            <div class="name">${escapeHtml(m.name)}</div>
+            <div class="bars">
+              <div class="bar armor${hideArmor ? " is-hidden" : ""}"><i style="width:${armor}%"></i></div>
+              <div class="bar health"><i style="width:${health}%"></i></div>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function render() {
+      document.getElementById("crew").innerHTML = members.map(card).join("");
+      applyMode();
+    }
+
+    document.querySelectorAll("[data-size]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        size = btn.dataset.size;
+        applySize();
+      });
+    });
+
+    document.querySelectorAll("[data-mode]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        mode = btn.dataset.mode;
+        applyMode();
+      });
+    });
+
+    document.getElementById("btn-damage").addEventListener("click", () => {
+      members.forEach((m) => {
+        if (!m.alive) return;
+        let left = 12 + Math.floor(Math.random() * 30);
+        if (m.armor > 0) {
+          const taken = Math.min(m.armor, left);
+          m.armor -= taken;
+          left -= taken;
+        }
+        if (left > 0) m.health = clamp(m.health - left, 0, 100);
+        if (m.health <= 0) m.alive = false;
+      });
+      render();
+    });
+
+    document.getElementById("btn-reset").addEventListener("click", () => {
+      members.forEach((m) => {
+        m.armor = 100;
+        m.health = 100;
+        m.alive = true;
+      });
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
