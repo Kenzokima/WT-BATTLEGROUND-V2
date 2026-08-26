@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WTBG Preview — Crew List 2</title>
+  <style>
+    :root {
+      --panel: rgba(28, 22, 40, 0.78);
+      --track: rgba(0, 0, 0, 0.45);
+      --health: #3fd13a;
+      --armor: #3db7ff;
+      --ink: #ffffff;
+      --muted: rgba(255, 255, 255, 0.55);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 20% 10%, #4a3a58 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, #243044 0%, transparent 45%),
+        #1a1d24;
+    }
+
+    .stage {
+      width: min(980px, 94vw);
+      padding: 28px;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .stage { grid-template-columns: 1fr; }
+    }
+
+    .label {
+      grid-column: 1 / -1;
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ===== Fortnite-like crew cards ===== */
+    .crew {
+      width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      user-select: none;
+    }
+
+    .member {
+      display: grid;
+      grid-template-columns: 54px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 8px 6px 6px;
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    .member.is-dead {
+      opacity: 0.42;
+      filter: grayscale(0.35);
+    }
+
+    .avatar {
+      width: 54px;
+      height: 54px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #2a2436;
+      position: relative;
+    }
+
+    .avatar img,
+    .avatar .fallback {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+
+    .avatar .fallback {
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.75);
+      background: linear-gradient(160deg, #4a3d5c, #2a2436);
+    }
+
+    .mid {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .name-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .diamond {
+      width: 10px;
+      height: 10px;
+      flex: 0 0 auto;
+      transform: rotate(45deg);
+      border-radius: 1px;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+    }
+
+    .name {
+      flex: 1;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    }
+
+    .bars {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .bar {
+      position: relative;
+      height: 8px;
+      border-radius: 2px;
+      background: var(--track);
+      overflow: hidden;
+    }
+
+    .bar.armor {
+      height: 7px;
+    }
+
+    .bar.health {
+      height: 9px;
+    }
+
+    .bar > i {
+      display: block;
+      height: 100%;
+      width: 0%;
+      position: relative;
+      transition: width 140ms linear;
+    }
+
+    .bar.armor > i {
+      background: var(--armor);
+    }
+
+    .bar.health > i {
+      background: var(--health);
+    }
+
+    /* yellow tick at end of fill (mirip referensi) */
+    .bar.health > i::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 2px;
+      height: 100%;
+      background: #f0d84a;
+      box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
+    }
+
+    .bar.is-hidden {
+      display: none;
+    }
+
+    .shield-wrap {
+      width: 22px;
+      display: grid;
+      place-items: center;
+      align-self: end;
+      margin-bottom: 2px;
+    }
+
+    .shield-wrap svg {
+      width: 18px;
+      height: 18px;
+      color: #8fdfff;
+      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+    }
+
+    .shield-wrap.is-empty {
+      opacity: 0.25;
+    }
+
+    /* diamond colors */
+    .d1 { background: #ff4d7a; }
+    .d2 { background: #f0d23a; }
+    .d3 { background: #58d84a; }
+    .d4 { background: #8a5cff; }
+
+    /* ===== placement ===== */
+    .placement {
+      position: relative;
+      min-height: 320px;
+      border-radius: 10px;
+      border: 1px dashed rgba(255, 255, 255, 0.18);
+      background: rgba(0, 0, 0, 0.22);
+      overflow: hidden;
+    }
+
+    .placement .tag {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .placement .crew {
+      position: absolute;
+      top: 42px;
+      left: 16px;
+      width: 300px;
+    }
+
+    .placement .member {
+      padding: 5px 7px 5px 5px;
+      gap: 7px;
+      grid-template-columns: 46px 1fr auto;
+    }
+
+    .placement .avatar {
+      width: 46px;
+      height: 46px;
+    }
+
+    .placement .name {
+      font-size: 13px;
+    }
+
+    .panel {
+      grid-column: 1 / -1;
+      padding: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.28);
+    }
+
+    .panel h2 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .actions button,
+    .row-actions button {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .actions button:hover,
+    .row-actions button:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .editor {
+      display: grid;
+      gap: 10px;
+    }
+
+    .editor-row {
+      display: grid;
+      grid-template-columns: 22px 1.2fr 80px 80px auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    @media (max-width: 860px) {
+      .editor-row {
+        grid-template-columns: 22px 1fr;
+      }
+    }
+
+    .editor-row input[type="text"],
+    .editor-row input[type="number"] {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(0, 0, 0, 0.35);
+      color: #fff;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      transform: rotate(45deg);
+      border-radius: 1px;
+    }
+
+    .note {
+      margin-top: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <p class="label">Preview · Crew list 2 (avatar + HP/armor style Fortnite)</p>
+
+    <aside>
+      <div class="crew" id="crew-demo"></div>
+    </aside>
+
+    <section class="placement" aria-label="Posisi in-game">
+      <span class="tag">Posisi di game · kiri atas (squad cards)</span>
+      <div class="crew" id="crew-ingame"></div>
+    </section>
+
+    <div class="panel">
+      <h2>Edit crew (preview)</h2>
+      <div class="actions">
+        <button type="button" id="btn-damage">Random damage</button>
+        <button type="button" id="btn-reset">Reset full</button>
+        <button type="button" id="btn-strip-armor">Strip armor semua</button>
+      </div>
+      <div class="editor" id="editor"></div>
+      <p class="note">
+        Style referensi: kartu gelap rounded, avatar kiri, diamond warna + nama,
+        bar armor biru di atas health hijau, shield kanan.
+        Armor bar disembunyikan otomatis kalau armor = 0. Preview saja — belum ke <code>wtbg_ui</code>.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const DIAMONDS = ["d1", "d2", "d3", "d4"];
+
+    const members = [
+      {
+        name: "Jonathanuop",
+        armor: 0,
+        health: 28,
+        alive: true,
+        initial: "J",
+      },
+      {
+        name: "SlimBarnacle3300",
+        armor: 50,
+        health: 96,
+        alive: true,
+        initial: "S",
+      },
+      {
+        name: "WT.Reza",
+        armor: 100,
+        health: 100,
+        alive: true,
+        initial: "R",
+      },
+      {
+        name: "Kenzo",
+        armor: 35,
+        health: 70,
+        alive: true,
+        initial: "K",
+      },
+    ];
+
+    function clamp(n, min, max) {
+      return Math.max(min, Math.min(max, Number(n) || 0));
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    const SHIELD_SVG = `
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2.2 4.5 5v6.2c0 4.85 3.2 9.35 7.5 10.55C16.3 20.55 19.5 16.05 19.5 11.2V5L12 2.2z"/>
+      </svg>`;
+
+    function memberCard(m, index) {
+      const dead = !m.alive || m.health <= 0;
+      const armor = clamp(m.armor, 0, 100);
+      const health = clamp(m.health, 0, 100);
+      const hideArmor = armor <= 0;
+
+      return `
+        <article class="member${dead ? " is-dead" : ""}">
+          <div class="avatar">
+            <div class="fallback">${escapeHtml(m.initial || m.name.slice(0, 1))}</div>
+          </div>
+          <div class="mid">
+            <div class="name-row">
+              <span class="diamond ${DIAMONDS[index % DIAMONDS.length]}"></span>
+              <span class="name">${escapeHtml(m.name)}</span>
+            </div>
+            <div class="bars">
+              <div class="bar armor${hideArmor ? " is-hidden" : ""}"><i style="width:${armor}%"></i></div>
+              <div class="bar health"><i style="width:${health}%"></i></div>
+            </div>
+          </div>
+          <div class="shield-wrap${hideArmor ? " is-empty" : ""}">${SHIELD_SVG}</div>
+        </article>`;
+    }
+
+    function renderCrew(targetId) {
+      document.getElementById(targetId).innerHTML = members
+        .map((m, i) => memberCard(m, i))
+        .join("");
+    }
+
+    function renderEditor() {
+      document.getElementById("editor").innerHTML = members
+        .map((m, i) => `
+          <div class="editor-row" data-index="${i}">
+            <div class="dot ${DIAMONDS[i % DIAMONDS.length]}"></div>
+            <input type="text" data-field="name" value="${escapeHtml(m.name)}" />
+            <input type="number" data-field="armor" min="0" max="100" value="${m.armor}" title="Armor" />
+            <input type="number" data-field="health" min="0" max="100" value="${m.health}" title="Health" />
+            <div class="row-actions">
+              <button type="button" data-action="toggle">${m.alive && m.health > 0 ? "Kill" : "Revive"}</button>
+            </div>
+          </div>
+        `)
+        .join("");
+    }
+
+    function renderAll() {
+      renderCrew("crew-demo");
+      renderCrew("crew-ingame");
+      renderEditor();
+    }
+
+    document.getElementById("editor").addEventListener("input", (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement)) return;
+      const row = input.closest(".editor-row");
+      if (!row) return;
+      const index = Number(row.dataset.index);
+      const field = input.dataset.field;
+      if (field === "name") {
+        members[index].name = input.value;
+        members[index].initial = input.value.trim().slice(0, 1).toUpperCase() || "?";
+      } else if (field === "armor") {
+        members[index].armor = clamp(input.value, 0, 100);
+      } else if (field === "health") {
+        members[index].health = clamp(input.value, 0, 100);
+        members[index].alive = members[index].health > 0;
+      }
+      renderCrew("crew-demo");
+      renderCrew("crew-ingame");
+    });
+
+    document.getElementById("editor").addEventListener("click", (event) => {
+      const btn = event.target.closest("button[data-action]");
+      if (!btn) return;
+      const row = btn.closest(".editor-row");
+      const index = Number(row.dataset.index);
+      const m = members[index];
+      const action = btn.dataset.action;
+
+      if (action === "toggle") {
+        if (m.alive && m.health > 0) {
+          m.alive = false;
+          m.health = 0;
+        } else {
+          m.alive = true;
+          m.health = Math.max(m.health, 40);
+        }
+      }
+      renderAll();
+    });
+
+    document.getElementById("btn-damage").addEventListener("click", () => {
+      members.forEach((m) => {
+        if (!m.alive) return;
+        let left = 10 + Math.floor(Math.random() * 30);
+        if (m.armor > 0) {
+          const taken = Math.min(m.armor, left);
+          m.armor -= taken;
+          left -= taken;
+        }
+        if (left > 0) m.health = clamp(m.health - left, 0, 100);
+        if (m.health <= 0) m.alive = false;
+      });
+      renderAll();
+    });
+
+    document.getElementById("btn-reset").addEventListener("click", () => {
+      members.forEach((m) => {
+        m.armor = 100;
+        m.health = 100;
+        m.alive = true;
+      });
+      renderAll();
+    });
+
+    document.getElementById("btn-strip-armor").addEventListener("click", () => {
+      members.forEach((m) => {
+        m.armor = 0;
+      });
+      renderAll();
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>

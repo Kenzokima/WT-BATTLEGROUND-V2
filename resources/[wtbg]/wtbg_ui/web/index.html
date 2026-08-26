@@ -221,6 +221,31 @@
 
         <section id="killfeed"></section>
 
+        <section id="vitals" class="hidden">
+            <div class="vital-row" id="vital-armor-row">
+                <div class="vital-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2.2 4.5 5v6.2c0 4.85 3.2 9.35 7.5 10.55C16.3 20.55 19.5 16.05 19.5 11.2V5L12 2.2z"/>
+                    </svg>
+                </div>
+                <div class="vital-bar armor">
+                    <div class="vital-fill" id="armor-fill"></div>
+                    <span class="vital-text" id="armor-text">0 | 100</span>
+                </div>
+            </div>
+            <div class="vital-row" id="vital-health-row">
+                <div class="vital-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9.2 3.2h5.6v5.6h5.6v5.6h-5.6v5.6H9.2v-5.6H3.6V8.8h5.6z"/>
+                    </svg>
+                </div>
+                <div class="vital-bar health">
+                    <div class="vital-fill" id="health-fill"></div>
+                    <span class="vital-text" id="health-text">100 | 100</span>
+                </div>
+            </div>
+        </section>
+
         <section id="result" class="screen hidden">
             <div class="result-card">
                 <p id="result-kicker" class="kicker">MATCH OVER</p>
