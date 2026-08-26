@@ -9,8 +9,10 @@ const toasts = document.getElementById('toasts');
 const partySlots = document.getElementById('party-slots');
 const squadSlots = document.getElementById('squad-slots');
 const squadPanel = document.getElementById('squad-panel');
+const vitals = document.getElementById('vitals');
 
 let invitePartyId = null;
+let vitalsAllowed = false;
 
 function resourceName() {
     if (typeof GetParentResourceName === 'function') {
@@ -35,7 +37,36 @@ function setScreen(name) {
     show(lobby, name === 'lobby');
     show(hud, name === 'match');
     show(result, name === 'result');
+    vitalsAllowed = name === 'lobby' || name === 'match';
+    show(vitals, vitalsAllowed);
     app.classList.remove('hidden');
+}
+
+function setBar(kind, value, max) {
+    const safeMax = Math.max(1, Number(max) || 100);
+    const safeValue = Math.max(0, Math.min(safeMax, Math.round(Number(value) || 0)));
+    const pct = (safeValue / safeMax) * 100;
+    document.getElementById(`${kind}-fill`).style.width = `${pct}%`;
+    document.getElementById(`${kind}-text`).textContent = `${safeValue} | ${safeMax}`;
+    document.getElementById(`vital-${kind}-row`).classList.toggle('is-empty', safeValue <= 0);
+}
+
+function updateVitals(data) {
+    setBar('health', data.health, data.maxHealth);
+    setBar('armor', data.armor, data.maxArmor);
+}
+
+function placeVitals(anchor) {
+    // anchor: nilai 0..1 dari client (posisi & ukuran minimap)
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const mapWidth = anchor.width * w;
+    const gap = Math.max(6, mapWidth * 0.03);
+
+    vitals.style.left = `${anchor.leftX * w}px`;
+    vitals.style.width = `${mapWidth}px`;
+    vitals.style.bottom = `${h - anchor.topY * h + gap}px`;
+    vitals.style.setProperty('--vscale', String(Math.max(0.75, mapWidth / 270)));
 }
 
 function setMenu(open) {
@@ -130,6 +161,14 @@ window.addEventListener('message', (event) => {
             app.classList.add('hidden');
             setMenu(false);
             show(invite, false);
+            vitalsAllowed = false;
+            show(vitals, false);
+            break;
+        case 'vitals':
+            updateVitals(data);
+            break;
+        case 'vitalsAnchor':
+            placeVitals(data);
             break;
         case 'menu':
             setMenu(Boolean(data.open));
