@@ -24,5 +24,6 @@ files {
 }
 
 client_scripts {
-    'client/ui.lua'
+    'client/ui.lua',
+    'client/vitals.lua'
 }
