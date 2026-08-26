@@ -6,7 +6,7 @@ local byPlayer = {}
 local invites = {}
 
 local function maxSize()
-    return Config.PartyMaxSize or 4
+    return Config.PartyMaxSize or 10
 end
 
 local function inviteTimeout()

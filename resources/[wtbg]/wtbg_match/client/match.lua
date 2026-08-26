@@ -4,6 +4,16 @@ local isDead = false
 local myTeamId = nil
 local allowFriendlyFire = false
 
+local function isSpectating()
+    if GetResourceState('wtbg_spectator') ~= 'started' then
+        return false
+    end
+    local ok, value = pcall(function()
+        return exports.wtbg_spectator:IsSpectating()
+    end)
+    return ok and value == true
+end
+
 local function stripWeapons(ped)
     RemoveAllPedWeapons(ped, true)
     SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
@@ -143,12 +153,14 @@ end)
 CreateThread(function()
     while true do
         if inMatch and isDead then
-            local ped = PlayerPedId()
-            if not IsEntityDead(ped) and not IsPedDeadOrDying(ped, true) then
-                stripWeapons(ped)
-                FreezeEntityPosition(ped, true)
-                SetEntityInvincible(ped, true)
-                SetEntityAlpha(ped, 80, false)
+            if not isSpectating() then
+                local ped = PlayerPedId()
+                if not IsEntityDead(ped) and not IsPedDeadOrDying(ped, true) then
+                    stripWeapons(ped)
+                    FreezeEntityPosition(ped, true)
+                    SetEntityInvincible(ped, true)
+                    SetEntityAlpha(ped, 80, false)
+                end
             end
             Wait(400)
         else

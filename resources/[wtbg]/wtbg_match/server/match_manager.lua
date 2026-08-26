@@ -13,6 +13,13 @@ local function matchMode()
     return 'SQUAD'
 end
 
+local function isSoloTest(match)
+    return Config.Debug == true
+        and Config.AllowSoloTest == true
+        and match ~= nil
+        and WTBG.Count(match.players) == 1
+end
+
 local function snapshot(match)
     if not match then
         return nil
@@ -773,12 +780,12 @@ function WTBG.Match.Start(source, matchId)
         return false, 'not_waiting'
     end
 
-    if WTBG.Count(match.players) < Config.MinPlayers then
+    if WTBG.Count(match.players) < Config.MinPlayers and not isSoloTest(match) then
         return false, 'not_enough_players'
     end
 
     recountAliveTeams(match)
-    if match.aliveTeams < 2 then
+    if match.aliveTeams < 2 and not isSoloTest(match) then
         return false, 'not_enough_teams'
     end
 
@@ -801,7 +808,8 @@ function WTBG.Match.Start(source, matchId)
         end
 
         recountAliveTeams(current)
-        if WTBG.Count(current.players) < Config.MinPlayers or current.aliveTeams < 2 then
+        if (WTBG.Count(current.players) < Config.MinPlayers or current.aliveTeams < 2)
+            and not isSoloTest(current) then
             abortStart(current)
             return
         end
@@ -954,7 +962,9 @@ function WTBG.Match.HandleDisconnect(source, state)
     removeMember(match, source)
 
     recountAliveTeams(match)
-    if match.state == WTBG.MatchStates.STARTING and (WTBG.Count(match.players) < Config.MinPlayers or match.aliveTeams < 2) then
+    if match.state == WTBG.MatchStates.STARTING
+        and (WTBG.Count(match.players) < Config.MinPlayers or match.aliveTeams < 2)
+        and not isSoloTest(match) then
         abortStart(match)
         return
     end

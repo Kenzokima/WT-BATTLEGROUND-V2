@@ -49,7 +49,7 @@ local function leaveVehicle(ped)
 end
 
 local function reportDestroyed(veh)
-    if not DoesEntityExist(veh) then
+    if not DoesEntityExist(veh) or not NetworkGetEntityIsNetworked(veh) then
         return
     end
     local st = Entity(veh).state
@@ -63,8 +63,7 @@ local function reportDestroyed(veh)
         return
     end
     reported[key] = true
-    local netId = NetworkGetNetworkIdFromEntity(veh)
-    TriggerServerEvent('wtbg:vehicle:destroyed', matchId, vehicleId, netId)
+    TriggerServerEvent('wtbg:vehicle:destroyed', matchId, vehicleId, 0)
 end
 
 RegisterNetEvent('wtbg:match:enter', function()
@@ -170,7 +169,7 @@ CreateThread(function()
             local my = PlayerPedId()
             for i = 1, #pool do
                 local veh = pool[i]
-                if DoesEntityExist(veh) and Entity(veh).state.wtbgVehicle then
+                if DoesEntityExist(veh) and NetworkGetEntityIsNetworked(veh) and Entity(veh).state.wtbgVehicle then
                     if GetVehicleEngineHealth(veh) <= 0.0 or IsEntityDead(veh) then
                         reportDestroyed(veh)
                     end

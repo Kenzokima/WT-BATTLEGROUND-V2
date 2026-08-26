@@ -112,10 +112,20 @@ local function tryStart(source)
     local prefer = spectators[source] and spectators[source].target
     local pick = list[1]
     if prefer then
+        local found = false
         for i = 1, #list do
             if list[i].id == prefer then
                 pick = list[i]
+                found = true
                 break
+            end
+        end
+        if not found then
+            for i = 1, #list do
+                if list[i].id > prefer then
+                    pick = list[i]
+                    break
+                end
             end
         end
     end
@@ -135,6 +145,17 @@ local function refreshMatch(matchId)
     end
     for src, row in pairs(spectators) do
         if row.matchId == matchId then
+            tryStart(src)
+        end
+    end
+
+    local snap = exports.wtbg_match:GetMatch(matchId)
+    if not snap or type(snap.players) ~= 'table' then
+        return
+    end
+    for key, member in pairs(snap.players) do
+        local src = tonumber(member.source) or tonumber(key)
+        if src and member.alive == false and not spectators[src] then
             tryStart(src)
         end
     end
@@ -182,7 +203,7 @@ local function step(source, dir)
         return
     end
 
-    local idx = 1
+    local idx = nil
     local current = spectators[source].target
     for i = 1, #list do
         if list[i].id == current then
@@ -190,10 +211,14 @@ local function step(source, dir)
             break
         end
     end
-    idx = idx + dir
-    if idx < 1 then
-        idx = #list
-    elseif idx > #list then
+    if idx then
+        idx = idx + dir
+        if idx < 1 then
+            idx = #list
+        elseif idx > #list then
+            idx = 1
+        end
+    else
         idx = 1
     end
 
@@ -208,6 +233,15 @@ end
 AddEventHandler('wtbg:match:playerEliminated', function(source, matchId)
     tryStart(source)
     refreshMatch(matchId)
+    CreateThread(function()
+        for _ = 1, 8 do
+            if spectators[source] then
+                return
+            end
+            Wait(500)
+            tryStart(source)
+        end
+    end)
 end)
 
 AddEventHandler('wtbg:match:playerDowned', function(_, matchId)

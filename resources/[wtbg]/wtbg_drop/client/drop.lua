@@ -12,6 +12,7 @@ local landStable = 0
 local lastHud = ''
 local gen = 0
 local cam = nil
+local camPos = nil
 local passengers = {}
 local clones = {}
 local hidden = {}
@@ -20,7 +21,8 @@ local lastSeatCheck = 0
 local cloneSlots = {}
 local pilot = nil
 local aiFlying = false
-local planeCamReady = false
+local lookYaw = 0.0
+local lookPitch = 0.0
 
 local function clearBlips()
     if startBlip then
@@ -47,8 +49,12 @@ local function makeCoordBlip(x, y, sprite, colour)
 end
 
 local function destroyCam(blend)
-    if not cam then
+    lookYaw = 0.0
+    lookPitch = 0.0
+    camPos = nil
+    if not cam or not DoesCamExist(cam) then
         RenderScriptCams(false, false, 0, true, true)
+        cam = nil
         return
     end
     local ms = blend and (tonumber(DropConfig.CameraBlend) or 350) or 0
@@ -79,15 +85,6 @@ local function isolateLocal(ent)
         return
     end
     SetEntityAsMissionEntity(ent, true, true)
-    if not NetworkGetEntityIsNetworked(ent) then
-        return
-    end
-    local nid = NetworkGetNetworkIdFromEntity(ent)
-    if not nid or nid == 0 then
-        return
-    end
-    SetNetworkIdCanMigrate(nid, false)
-    SetNetworkIdExistsOnAllMachines(nid, false)
 end
 
 local function hideRemotePeds()
@@ -162,23 +159,26 @@ local function stopSeatAnim(ped)
     ClearPedTasksImmediately(ped)
 end
 
-local function detachLocal()
+local function detachLocal(keepFrozen)
     local ped = PlayerPedId()
+    FreezeEntityPosition(ped, true)
+    SetEntityVelocity(ped, 0.0, 0.0, 0.0)
     stopSeatAnim(ped)
     local veh = GetVehiclePedIsIn(ped, false)
     if veh ~= 0 then
         TaskLeaveVehicle(ped, veh, 16)
+        ClearPedTasksImmediately(ped)
     end
     if IsEntityAttached(ped) then
-        DetachEntity(ped, true, true)
+        DetachEntity(ped, false, true)
     end
-    FreezeEntityPosition(ped, false)
+    SetEntityVelocity(ped, 0.0, 0.0, 0.0)
+    FreezeEntityPosition(ped, keepFrozen and true or false)
     SetEntityCollision(ped, true, true)
     SetEntityVisible(ped, true, false)
     SetEntityInvincible(ped, false)
     SetPlayerInvincible(PlayerId(), false)
     SetPedCanRagdoll(ped, true)
-    planeCamReady = false
 end
 
 local function clearDrop(restore)
@@ -253,12 +253,62 @@ local function routeHeading()
     return DropConfig.TravelHeading(route.sx, route.sy, route.fx, route.fy)
 end
 
-local function routePos()
-    local t = progress()
+local function routePosAt(t)
+    t = math.min(1.0, math.max(0.0, tonumber(t) or 0.0))
     local x = route.sx + (route.fx - route.sx) * t
     local y = route.sy + (route.fy - route.sy) * t
     local z = route.sz + (route.fz - route.sz) * t
     return x, y, z, routeHeading()
+end
+
+local function routePos()
+    return routePosAt(progress())
+end
+
+local function routeDistance()
+    if not route then
+        return 1.0
+    end
+    local dx = (route.fx or 0.0) - (route.sx or 0.0)
+    local dy = (route.fy or 0.0) - (route.sy or 0.0)
+    local dz = (route.fz or 0.0) - (route.sz or 0.0)
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+end
+
+local function cruiseSpeed(veh)
+    local dist = routeDistance()
+    local sec = math.max(1.0, (tonumber(route and route.durationMs) or 80000) / 1000.0)
+    local needed = dist / sec
+    local modelMax = 72.0
+    if veh and DoesEntityExist(veh) then
+        local ok, v = pcall(GetVehicleModelMaxSpeed, GetEntityModel(veh))
+        if ok and type(v) == 'number' and v > 10.0 then
+            modelMax = v
+        end
+    end
+    local cap = tonumber(DropConfig.MaxCruiseSpeed)
+    if cap and cap > 0.0 then
+        return math.max(40.0, math.min(cap, needed))
+    end
+    -- Stay close to GTA Titan cruise; modest boost so the drop still covers ground.
+    return math.max(40.0, math.min(needed, modelMax * 1.25))
+end
+
+local function keepEngineRunning(veh, speed)
+    if not veh or not DoesEntityExist(veh) then
+        return
+    end
+    SetVehicleEngineOn(veh, true, true, false)
+    SetVehicleUndriveable(veh, false)
+    SetVehicleKeepEngineOnWhenAbandoned(veh, true)
+    if speed and speed > 1.0 then
+        pcall(function()
+            SetVehicleForwardSpeed(veh, speed)
+        end)
+    end
+    pcall(function()
+        SetVehicleCurrentRpm(veh, 0.92)
+    end)
 end
 
 local function applyPlanePose(veh)
@@ -266,71 +316,154 @@ local function applyPlanePose(veh)
         return
     end
     local x, y, z, h = routePos()
-    local pitch = tonumber(DropConfig.FlightPitch) or -5.0
+    local pitch = tonumber(DropConfig.FlightPitch) or -1.5
     FreezeEntityPosition(veh, true)
     SetEntityCollision(veh, false, false)
     SetEntityCoordsNoOffset(veh, x, y, z, false, false, false)
     SetEntityRotation(veh, pitch, 0.0, h, 2, true)
-    SetVehicleEngineOn(veh, true, true, false)
+    keepEngineRunning(veh)
 end
 
-local function cruiseSpeed()
-    if not route then
-        return 55.0
+local function ensurePilot(veh)
+    if not veh or not DoesEntityExist(veh) then
+        return nil
     end
-    local dx = (route.fx or 0.0) - (route.sx or 0.0)
-    local dy = (route.fy or 0.0) - (route.sy or 0.0)
-    local dz = (route.fz or 0.0) - (route.sz or 0.0)
-    local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-    local sec = math.max(1.0, (tonumber(route.durationMs) or 25000) / 1000.0)
-    return math.max(42.0, dist / sec)
+    if pilot and DoesEntityExist(pilot) and IsPedInVehicle(pilot, veh, false) then
+        return pilot
+    end
+    if pilot and DoesEntityExist(pilot) then
+        DeleteEntity(pilot)
+    end
+    pilot = nil
+
+    local hash = joaat(DropConfig.PilotModel or 's_m_m_pilot_01')
+    if not HasModelLoaded(hash) then
+        RequestModel(hash)
+        return nil
+    end
+
+    local ped = CreatePedInsideVehicle(veh, 26, hash, -1, false, false)
+    if not ped or ped == 0 then
+        local c = GetEntityCoords(veh)
+        ped = CreatePed(26, hash, c.x, c.y, c.z, GetEntityHeading(veh), false, false)
+        if ped and ped ~= 0 then
+            SetPedIntoVehicle(ped, veh, -1)
+        end
+    end
+    if not ped or ped == 0 then
+        return nil
+    end
+
+    isolateLocal(ped)
+    SetBlockingOfNonTemporaryEvents(ped, true)
+    SetEntityInvincible(ped, true)
+    SetPedCanRagdoll(ped, false)
+    SetPedCanBeDraggedOut(ped, false)
+    SetPedFleeAttributes(ped, 0, false)
+    SetPedKeepTask(ped, true)
+    SetDriverAbility(ped, 1.0)
+    SetDriverAggressiveness(ped, 0.0)
+    SetEntityVisible(ped, true, false)
+    SetModelAsNoLongerNeeded(hash)
+    pilot = ped
+    return ped
+end
+
+local function taskFlyToEnd(driver, veh, speed)
+    if not driver or not veh or not route then
+        return
+    end
+    local h = routeHeading()
+    ClearPedTasks(driver)
+    pcall(function()
+        TaskPlaneMission(driver, veh, 0, 0, route.fx, route.fy, route.fz, 4, speed, 1.0, h, 2000.0, 80.0)
+    end)
 end
 
 local function beginCruise()
     if aiFlying or not plane or not DoesEntityExist(plane) or not route then
         return
     end
-    local x, y, z, h = routePos()
-    local pitch = tonumber(DropConfig.FlightPitch) or -5.0
-    local speed = cruiseSpeed()
+    local driver = ensurePilot(plane)
+    if not driver then
+        return
+    end
+
+    local speed = cruiseSpeed(plane)
+    local h = routeHeading()
     local fx, fy = DropConfig.Forward(h)
-    FreezeEntityPosition(plane, false)
-    SetEntityCollision(plane, false, false)
-    SetEntityHasGravity(plane, false)
-    SetVehicleEngineOn(plane, true, true, false)
     pcall(function()
         SetVehicleLandingGear(plane, 3)
-        SetPlaneTurbulenceMultiplier(plane, 0.0)
-        SetVehicleGravity(plane, false)
+        SetPlaneTurbulenceMultiplier(plane, tonumber(DropConfig.CruiseTurbulence) or 0.28)
+        SetVehicleCheatPowerIncrease(plane, 8.0)
+        ModifyVehicleTopSpeed(plane, speed * 1.2)
+        SetPlaneMinHeightAboveTerrain(plane, 80)
+        SetVehicleGravity(plane, true)
     end)
-    SetEntityCoordsNoOffset(plane, x, y, z, false, false, false)
-    SetEntityRotation(plane, pitch, 0.0, h, 2, true)
+    SetEntityCollision(plane, true, true)
+    SetEntityInvincible(plane, true)
+    SetEntityHasGravity(plane, true)
+    keepEngineRunning(plane)
+    SetVehicleForwardSpeed(plane, speed)
     SetEntityVelocity(plane, fx * speed, fy * speed, 0.0)
+    FreezeEntityPosition(plane, false)
+    taskFlyToEnd(driver, plane, speed)
     aiFlying = true
 end
 
-local function flyAlongRoute(veh)
+local function maintainCruise(veh)
     if not veh or not route then
         return
     end
-    local x, y, z, h = routePos()
-    local pitch = tonumber(DropConfig.FlightPitch) or -5.0
-    local speed = cruiseSpeed()
-    local fx, fy = DropConfig.Forward(h)
-    local c = GetEntityCoords(veh)
+
     FreezeEntityPosition(veh, false)
-    SetEntityCollision(veh, false, false)
-    SetEntityHasGravity(veh, false)
-    SetVehicleEngineOn(veh, true, true, false)
-    SetEntityRotation(veh, pitch, 0.0, h, 2, true)
-    local k = 2.4
-    SetEntityVelocity(veh, fx * speed + (x - c.x) * k, fy * speed + (y - c.y) * k, (z - c.z) * k)
+    SetEntityCollision(veh, true, true)
+    SetEntityHasGravity(veh, true)
+    keepEngineRunning(veh)
+    pcall(function()
+        SetVehicleLandingGear(veh, 3)
+        SetVehicleGravity(veh, true)
+    end)
+
+    local speed = cruiseSpeed(veh)
+    local driver = ensurePilot(veh)
+    if driver and not IsPedInVehicle(driver, veh, false) then
+        SetPedIntoVehicle(driver, veh, -1)
+        taskFlyToEnd(driver, veh, speed)
+    end
+
+    local current = GetEntitySpeed(veh)
+    local c = GetEntityCoords(veh)
+    local vel = GetEntityVelocity(veh)
+    -- Stall / dive recovery only. Do not drive the plane every frame.
+    if current < 16.0 then
+        local h = GetEntityHeading(veh)
+        local fx, fy = DropConfig.Forward(h)
+        SetVehicleForwardSpeed(veh, speed)
+        SetEntityVelocity(veh, fx * speed, fy * speed, math.max(vel.z, -2.0))
+    elseif vel.z < -14.0 and c.z < (route.sz - 30.0) then
+        SetEntityVelocity(veh, vel.x, vel.y, -4.0)
+    end
+
+    if c.z < 90.0 then
+        local x, y, z, h = routePos()
+        SetEntityCoordsNoOffset(veh, x, y, z, false, false, false)
+        SetEntityHeading(veh, h)
+        SetVehicleForwardSpeed(veh, speed)
+        aiFlying = false
+    end
 end
 
 local function ensurePlane()
     if plane and DoesEntityExist(plane) then
         return plane
     end
+    if pilot and DoesEntityExist(pilot) then
+        DeleteEntity(pilot)
+    end
+    pilot = nil
+    aiFlying = false
+
     local hash = loadModel(DropConfig.PlaneModel or 'titan')
     if not HasModelLoaded(hash) then
         return nil
@@ -346,7 +479,7 @@ local function ensurePlane()
     SetEntityInvincible(plane, true)
     SetEntityProofs(plane, true, true, true, true, true, true, true, true)
     FreezeEntityPosition(plane, true)
-    SetVehicleEngineOn(plane, true, true, false)
+    keepEngineRunning(plane)
     SetVehRadioStation(plane, 'OFF')
     SetVehicleKeepEngineOnWhenAbandoned(plane, true)
     pcall(function()
@@ -354,8 +487,10 @@ local function ensurePlane()
     end)
     SetEntityLodDist(plane, 800)
     SetModelAsNoLongerNeeded(hash)
+    RequestModel(joaat(DropConfig.PilotModel or 's_m_m_pilot_01'))
     SetEntityCoordsNoOffset(plane, x, y, z, false, false, false)
     SetEntityHeading(plane, h)
+    ensurePilot(plane)
     if cam then
         DestroyCam(cam, false)
         cam = nil
@@ -404,16 +539,64 @@ local function attachPassenger(ent, slot, key)
     playSeat(ent)
 end
 
-local function applyPlaneCam()
-    if planeCamReady then
+local function updateChaseCam()
+    if not plane or not DoesEntityExist(plane) then
         return
     end
-    pcall(function()
-        SetCamViewModeForContext(1, 2)
-        SetCamViewModeForContext(4, 2)
-        SetFollowVehicleCamViewMode(2)
-    end)
-    planeCamReady = true
+    if not cam or not DoesCamExist(cam) then
+        cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
+        SetCamFov(cam, tonumber(DropConfig.CameraFov) or 52.0)
+        SetCamActive(cam, true)
+        RenderScriptCams(true, false, 0, true, true)
+        camPos = nil
+    end
+    local mx = GetDisabledControlNormal(0, 1)
+    local my = GetDisabledControlNormal(0, 2)
+    lookYaw = lookYaw - mx * 7.0
+    if lookYaw > 120.0 then
+        lookYaw = 120.0
+    elseif lookYaw < -120.0 then
+        lookYaw = -120.0
+    end
+    lookPitch = lookPitch - my * 5.0
+    if lookPitch > 28.0 then
+        lookPitch = 28.0
+    elseif lookPitch < -40.0 then
+        lookPitch = -40.0
+    end
+    local planePos = GetEntityCoords(plane)
+    local planeHeading = GetEntityHeading(plane)
+    local off = DropConfig.CameraOffset or vector3(0.0, -34.0, 14.0)
+    local look = DropConfig.CameraLook or vector3(0.0, 14.0, 1.5)
+    local orbitHeading = planeHeading + lookYaw
+    local orbitFx, orbitFy = DropConfig.Forward(orbitHeading)
+    local orbitRad = math.rad(orbitHeading)
+    local rightX, rightY = math.cos(orbitRad), math.sin(orbitRad)
+    local distance = math.abs(off.y)
+    local desiredX = planePos.x - orbitFx * distance + rightX * off.x
+    local desiredY = planePos.y - orbitFy * distance + rightY * off.x
+    local desiredZ = planePos.z + off.z + lookPitch * 0.18
+
+    if not camPos then
+        camPos = vector3(desiredX, desiredY, desiredZ)
+    else
+        local smoothing = tonumber(DropConfig.CameraSmoothing) or 7.5
+        local alpha = 1.0 - math.exp(-smoothing * math.max(GetFrameTime(), 0.001))
+        camPos = vector3(
+            camPos.x + (desiredX - camPos.x) * alpha,
+            camPos.y + (desiredY - camPos.y) * alpha,
+            camPos.z + (desiredZ - camPos.z) * alpha
+        )
+    end
+
+    local planeFx, planeFy = DropConfig.Forward(planeHeading)
+    SetCamCoord(cam, camPos.x, camPos.y, camPos.z)
+    PointCamAtCoord(
+        cam,
+        planePos.x + planeFx * look.y,
+        planePos.y + planeFy * look.y,
+        planePos.z + look.z
+    )
 end
 
 local function attachLocal()
@@ -422,36 +605,13 @@ local function attachLocal()
     if not veh or not DoesEntityExist(ped) then
         return
     end
-    if GetVehiclePedIsIn(ped, false) == veh then
-        SetEntityInvincible(ped, true)
-        SetPlayerInvincible(PlayerId(), true)
-        SetPedCanRagdoll(ped, false)
-        SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
-        applyPlaneCam()
-        return
-    end
-    if IsEntityAttached(ped) then
-        DetachEntity(ped, true, true)
-    end
-    FreezeEntityPosition(ped, false)
-    local seats = { 0, 1, 2, 3, -1 }
-    for i = 1, #seats do
-        SetPedIntoVehicle(ped, veh, seats[i])
-        if GetVehiclePedIsIn(ped, false) == veh then
-            break
-        end
-    end
-    if GetVehiclePedIsIn(ped, false) == veh then
-        SetEntityInvincible(ped, true)
-        SetPlayerInvincible(PlayerId(), true)
-        SetPedCanRagdoll(ped, false)
-        SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
-        applyPlaneCam()
-        return
+    if GetVehiclePedIsIn(ped, false) ~= 0 then
+        TaskLeaveVehicle(ped, GetVehiclePedIsIn(ped, false), 16)
     end
     local slot = slotFor(GetPlayerServerId(PlayerId())) or 1
-    if slot > #offsets() then
-        slot = 1
+    local seats = offsets()
+    if #seats > 0 and slot > #seats then
+        slot = ((slot - 1) % #seats) + 1
     end
     attachPassenger(ped, slot, 'local')
     FreezeEntityPosition(ped, true)
@@ -459,17 +619,6 @@ local function attachLocal()
     SetPlayerInvincible(PlayerId(), true)
     SetPedCanRagdoll(ped, false)
     SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
-    pcall(function()
-        SetFollowPedCamViewMode(2)
-    end)
-end
-
-local function ensureCam()
-    if cam then
-        destroyCam(false)
-        return
-    end
-    RenderScriptCams(false, false, 0, true, true)
 end
 
 local function hideRemote(serverId)
@@ -627,19 +776,40 @@ local function blockCombat()
     HideHudComponentThisFrame(19)
 end
 
+local function releasePose(data)
+    local current = progress()
+    local lo = tonumber(data.releaseMinProgress) or 0.0
+    local hi = tonumber(data.releaseMaxProgress) or 1.0
+    local accepted = math.min(hi, math.max(lo, current))
+    local back = tonumber(data.exitBack) or tonumber(DropConfig.JumpExitBack) or 16.0
+    local down = tonumber(data.exitDown) or tonumber(DropConfig.JumpExitDown) or 4.0
+
+    if plane and DoesEntityExist(plane) and accepted == current then
+        local c = GetOffsetFromEntityInWorldCoords(plane, 0.0, -back, -down)
+        return c.x, c.y, c.z, GetEntityHeading(plane)
+    end
+
+    local x, y, z, h = routePosAt(accepted)
+    local fx, fy = DropConfig.Forward(h)
+    return x - fx * back, y - fy * back, z - down, h
+end
+
 local function beginFreefall(data)
+    local x, y, z, heading = releasePose(data)
     phase = 'FREEFALL'
     landSent = false
     chuteSent = false
     landStable = 0
     destroyCam(true)
     clearClones()
-    detachLocal()
+    detachLocal(true)
     deletePlane()
     local ped = PlayerPedId()
-    RequestCollisionAtCoord(data.x, data.y, data.z)
-    SetEntityCoordsNoOffset(ped, data.x, data.y, data.z, false, false, false)
-    SetEntityHeading(ped, data.heading or routeHeading())
+    RequestCollisionAtCoord(x, y, z)
+    SetEntityCoordsNoOffset(ped, x, y, z, false, false, false)
+    SetEntityHeading(ped, heading)
+    SetEntityVelocity(ped, 0.0, 0.0, 0.0)
+    FreezeEntityPosition(ped, false)
     SetEntityVelocity(ped, 0.0, 0.0, -8.0)
     giveChute()
     pcall(function()
@@ -671,8 +841,9 @@ RegisterNetEvent('wtbg:drop:board', function(data)
     SetEntityHealth(ped, hp)
     SetPedArmour(ped, 0)
     setupBlips()
+    RequestModel(joaat(DropConfig.PilotModel or 's_m_m_pilot_01'))
     attachLocal()
-    ensureCam()
+    updateChaseCam()
     DoScreenFadeIn(220)
     pushHud(true)
 end)
@@ -693,7 +864,7 @@ RegisterNetEvent('wtbg:drop:go', function(data)
     route.flying = true
     setupBlips()
     attachLocal()
-    ensureCam()
+    updateChaseCam()
     beginCruise()
     hideForeignTitans()
     hideRemotePeds()
@@ -771,12 +942,13 @@ CreateThread(function()
             if veh then
                 if route.flying then
                     beginCruise()
-                    flyAlongRoute(veh)
+                    maintainCruise(veh)
                 else
                     applyPlanePose(veh)
+                    ensurePilot(veh)
                 end
                 attachLocal()
-                ensureCam()
+                updateChaseCam()
                 hideForeignTitans()
                 hideRemotePeds()
                 if GetGameTimer() > lastSeatCheck + 1500 then
@@ -823,7 +995,10 @@ CreateThread(function()
             if route.flying and IsDisabledControlJustPressed(0, 22) then
                 local elapsed = GetGameTimer() - flyStart
                 if elapsed >= (tonumber(route.jumpDelayMs) or 0) then
-                    TriggerServerEvent('wtbg:drop:requestJump')
+                    TriggerServerEvent('wtbg:drop:requestJump', {
+                        gen = gen,
+                        progress = progress()
+                    })
                 end
             end
             pushHud(false)

@@ -17,7 +17,7 @@
             </div>
             <aside id="party-panel" class="party-panel">
                 <p class="party-title">PARTY</p>
-                <p id="party-size" class="party-size">0 / 4</p>
+                <p id="party-size" class="party-size">0 / 10</p>
                 <ul id="party-slots"></ul>
             </aside>
         </section>
@@ -129,65 +129,94 @@
 
         <section id="inventory" class="inv-shell hidden">
             <div class="inv-overlay"></div>
-            <div class="inv-layout">
-                <article class="inv-col" id="col-vicinity">
-                    <p class="inv-title">VICINITY</p>
-                    <p id="vicinity-sub" class="inv-sub hidden"></p>
-                    <ul id="inv-vicinity" class="inv-cards"></ul>
-                </article>
-                <article class="inv-col" id="col-inventory">
-                    <p class="inv-title">INVENTORY</p>
-                    <p class="inv-kicker">AMMO</p>
-                    <ul id="inv-ammo" class="inv-cards"></ul>
-                    <p class="inv-kicker">MEDICAL</p>
-                    <ul id="inv-heal" class="inv-cards"></ul>
-                    <p class="inv-kicker">THROWABLE</p>
-                    <ul id="inv-throw" class="inv-cards"></ul>
-                </article>
-                <article class="inv-col" id="col-equipment">
-                    <p class="inv-title">EQUIPMENT</p>
-                    <div id="eq-primary" class="eq-slot" data-kind="weapon" data-key="primary">
-                        <em>1</em>
-                        <div>
-                            <span>PRIMARY</span>
-                            <strong id="inv-primary">Empty</strong>
-                            <p id="eq-primary-ammo" class="eq-ammo"></p>
-                        </div>
-                        <button type="button" class="eq-drop" data-kind="weapon" data-key="primary">Drop</button>
+            <div class="inv-frame">
+                <header class="inv-head">
+                    <div class="inv-brand">
+                        <span>WHITE TIGER BATTLEGROUND</span>
+                        <strong>INVENTORY</strong>
                     </div>
-                    <div id="eq-secondary" class="eq-slot" data-kind="weapon" data-key="secondary">
-                        <em>2</em>
-                        <div>
-                            <span>SECONDARY</span>
-                            <strong id="inv-secondary">Empty</strong>
-                            <p id="eq-secondary-ammo" class="eq-ammo"></p>
-                        </div>
-                        <button type="button" class="eq-drop" data-kind="weapon" data-key="secondary">Drop</button>
-                    </div>
-                    <div id="eq-sidearm" class="eq-slot" data-kind="weapon" data-key="sidearm">
-                        <em>3</em>
-                        <div>
-                            <span>SIDEARM</span>
-                            <strong id="inv-sidearm">Empty</strong>
-                            <p id="eq-sidearm-ammo" class="eq-ammo"></p>
-                        </div>
-                        <button type="button" class="eq-drop" data-kind="weapon" data-key="sidearm">Drop</button>
-                    </div>
-                    <div class="eq-armor">
+                    <div class="inv-armor">
                         <span>ARMOR</span>
+                        <div class="armor-track"><i id="armor-bar"></i></div>
                         <strong id="inv-armor">0 / 100</strong>
                     </div>
-                    <div class="inv-guide">
-                        <p class="inv-title">GUIDE</p>
-                        <ul>
-                            <li><em>F2 / TAB</em> CLOSE</li>
-                            <li><em>Click</em> ACTION</li>
-                            <li><em>Right Click</em> ACTION</li>
-                            <li><em>1 / 2 / 3</em> WEAPON</li>
-                        </ul>
-                    </div>
-                </article>
+                    <button id="inv-close" class="inv-close" type="button">CLOSE</button>
+                </header>
+
+                <div class="inv-body">
+                    <article class="inv-col" id="col-vicinity" data-zone="ground">
+                        <div class="col-head">
+                            <p class="inv-title">VICINITY</p>
+                            <span id="vicinity-count" class="col-count">0</span>
+                        </div>
+                        <p id="vicinity-sub" class="inv-sub hidden"></p>
+                        <ul id="inv-vicinity" class="tiles"></ul>
+                        <p class="zone-tag">DROP HERE</p>
+                    </article>
+
+                    <article class="inv-col" id="col-inventory" data-zone="bag">
+                        <div class="col-head">
+                            <p class="inv-title">BACKPACK</p>
+                            <span id="bag-count" class="col-count">0</span>
+                        </div>
+                        <p class="inv-kicker">AMMO</p>
+                        <ul id="inv-ammo" class="tiles"></ul>
+                        <p class="inv-kicker">MEDICAL</p>
+                        <ul id="inv-heal" class="tiles"></ul>
+                        <p class="inv-kicker">THROWABLE</p>
+                        <ul id="inv-throw" class="tiles"></ul>
+                        <p class="zone-tag">PICK UP HERE</p>
+                    </article>
+
+                    <article class="inv-col" id="col-equipment">
+                        <div class="col-head">
+                            <p class="inv-title">EQUIPMENT</p>
+                        </div>
+                        <div id="eq-primary" class="eq-slot" data-zone="equip" data-slot="primary">
+                            <em class="eq-key">1</em>
+                            <div id="eq-primary-icon" class="eq-icon"></div>
+                            <div class="eq-meta">
+                                <span>PRIMARY</span>
+                                <strong id="inv-primary">Empty</strong>
+                                <p id="eq-primary-ammo" class="eq-ammo"></p>
+                            </div>
+                            <button type="button" class="eq-drop" data-kind="weapon" data-key="primary">Drop</button>
+                        </div>
+                        <div id="eq-secondary" class="eq-slot" data-zone="equip" data-slot="secondary">
+                            <em class="eq-key">2</em>
+                            <div id="eq-secondary-icon" class="eq-icon"></div>
+                            <div class="eq-meta">
+                                <span>SECONDARY</span>
+                                <strong id="inv-secondary">Empty</strong>
+                                <p id="eq-secondary-ammo" class="eq-ammo"></p>
+                            </div>
+                            <button type="button" class="eq-drop" data-kind="weapon" data-key="secondary">Drop</button>
+                        </div>
+                        <div id="eq-sidearm" class="eq-slot" data-zone="equip" data-slot="sidearm">
+                            <em class="eq-key">3</em>
+                            <div id="eq-sidearm-icon" class="eq-icon"></div>
+                            <div class="eq-meta">
+                                <span>SIDEARM</span>
+                                <strong id="inv-sidearm">Empty</strong>
+                                <p id="eq-sidearm-ammo" class="eq-ammo"></p>
+                            </div>
+                            <button type="button" class="eq-drop" data-kind="weapon" data-key="sidearm">Drop</button>
+                        </div>
+                        <div class="inv-guide">
+                            <p class="inv-title">CONTROLS</p>
+                            <ul>
+                                <li><em>DRAG</em> MOVE ITEM</li>
+                                <li><em>LMB</em> TAKE / USE</li>
+                                <li><em>RMB</em> DROP</li>
+                                <li><em>SHIFT + DRAG</em> DROP STACK</li>
+                                <li><em>1 / 2 / 3</em> WEAPON</li>
+                                <li><em>F2 / TAB</em> CLOSE</li>
+                            </ul>
+                        </div>
+                    </article>
+                </div>
             </div>
+            <div id="drag-ghost" class="drag-ghost hidden"></div>
         </section>
 
         <section id="killfeed"></section>

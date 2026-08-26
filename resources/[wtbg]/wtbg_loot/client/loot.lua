@@ -12,12 +12,13 @@ local function loadModel(name)
     if not IsModelValid(hash) then
         hash = `prop_cs_cardbox_01`
     end
-    if not HasModelLoaded(hash) then
-        RequestModel(hash)
-        local t = GetGameTimer() + 1500
-        while not HasModelLoaded(hash) and GetGameTimer() < t do
-            Wait(0)
-        end
+    if HasModelLoaded(hash) then
+        return hash
+    end
+    RequestModel(hash)
+    local t = GetGameTimer() + 400
+    while not HasModelLoaded(hash) and GetGameTimer() < t do
+        Wait(0)
     end
     return hash
 end
@@ -26,6 +27,7 @@ local function deleteObject(id)
     local ent = objects[id]
     objects[id] = nil
     if ent and DoesEntityExist(ent) then
+        SetEntityAsMissionEntity(ent, true, true)
         DeleteObject(ent)
     end
 end
@@ -42,41 +44,72 @@ local function clearAll()
     TriggerEvent('wtbg:ui:vicinity', {})
 end
 
+local function groundAt(x, y, z)
+    RequestCollisionAtCoord(x, y, z)
+    local probes = { z + 80.0, z + 25.0, 1000.0 }
+    for i = 1, #probes do
+        local found, gz = GetGroundZFor_3dCoord(x, y, probes[i], false)
+        if found and gz and gz > -50.0 then
+            return gz
+        end
+    end
+    return nil
+end
+
+local function createLocal(hash, x, y, z)
+    local obj
+    if CreateObjectNoOffset then
+        obj = CreateObjectNoOffset(hash, x, y, z, false, false, false)
+    else
+        obj = CreateObject(hash, x, y, z, false, false, false)
+    end
+    if obj and obj ~= 0 and DoesEntityExist(obj) then
+        return obj
+    end
+    return nil
+end
+
 local function spawnObject(entry)
-    deleteObject(entry.id)
+    local live = objects[entry.id]
+    if live and DoesEntityExist(live) then
+        return true
+    end
+    objects[entry.id] = nil
+
+    local gz = groundAt(entry.x, entry.y, entry.z)
+    if not gz then
+        return false
+    end
+
     local hash = loadModel(entry.model or 'prop_cs_cardbox_01')
     if not HasModelLoaded(hash) then
-        return
+        return false
     end
 
-    RequestCollisionAtCoord(entry.x, entry.y, entry.z)
-    local z = entry.z
-    local found, gz = GetGroundZFor_3dCoord(entry.x, entry.y, z + 80.0, false)
-    if found then
-        z = gz + 0.04
-    end
-
-    local obj = CreateObject(hash, entry.x, entry.y, z, false, false, false)
-    if (not obj or obj == 0) and hash ~= `prop_cs_cardbox_01` then
+    local z = gz + 0.08
+    local obj = createLocal(hash, entry.x, entry.y, z)
+    if not obj and hash ~= `prop_cs_cardbox_01` then
         hash = loadModel('prop_cs_cardbox_01')
-        obj = CreateObject(hash, entry.x, entry.y, z, false, false, false)
+        if HasModelLoaded(hash) then
+            obj = createLocal(hash, entry.x, entry.y, z)
+        end
     end
-    if not obj or obj == 0 then
-        return
+    if not obj then
+        return false
     end
 
+    SetEntityAsMissionEntity(obj, true, false)
     SetEntityCollision(obj, false, false)
     FreezeEntityPosition(obj, true)
-    if found then
-        SetEntityCoordsNoOffset(obj, entry.x, entry.y, z, false, false, false)
-    else
-        PlaceObjectOnGroundProperly(obj)
-    end
+    SetEntityCoordsNoOffset(obj, entry.x, entry.y, z, false, false, false)
+    SetEntityLodDist(obj, 280)
     objects[entry.id] = obj
+    return true
 end
 
 local STREAM = 220.0
 local STREAM_DROP = 260.0
+local SPAWN_PER_TICK = 4
 
 local function deploying()
     if GetResourceState('wtbg_drop') ~= 'started' then
@@ -92,13 +125,21 @@ local function streamObjects(origin)
     if deploying() then
         return
     end
+    local spawned = 0
     for id, entry in pairs(loot) do
         local dx = origin.x - entry.x
         local dy = origin.y - entry.y
         local d2 = dx * dx + dy * dy
         if d2 <= (STREAM * STREAM) then
-            if not objects[id] then
-                spawnObject(entry)
+            local ent = objects[id]
+            if ent and not DoesEntityExist(ent) then
+                objects[id] = nil
+                ent = nil
+            end
+            if not ent and spawned < SPAWN_PER_TICK then
+                if spawnObject(entry) then
+                    spawned = spawned + 1
+                end
             end
         elseif d2 >= (STREAM_DROP * STREAM_DROP) then
             if objects[id] then
@@ -151,10 +192,10 @@ local function nearbyEntries(origin, range)
         if d <= range then
             list[#list + 1] = {
                 id = entry.id,
+                itemId = entry.itemId,
                 label = entry.label,
                 amount = entry.amount or 1,
                 bag = entry.bag and true or false,
-                rarity = entry.rarity,
                 kind = entry.kind,
                 ammoType = entry.ammoType,
                 dist = d

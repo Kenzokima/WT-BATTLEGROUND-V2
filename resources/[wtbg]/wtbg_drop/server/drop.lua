@@ -105,10 +105,10 @@ local function setPlayer(dep, source, state)
     end
 end
 
-local function passengerIds(dep)
+local function passengerIds(dep, teamId)
     local list = {}
     for src, row in pairs(dep.players) do
-        if row.state == 'PLANE' then
+        if row.state == 'PLANE' and (teamId == nil or row.teamId == teamId) then
             list[#list + 1] = src
         end
     end
@@ -117,9 +117,9 @@ local function passengerIds(dep)
 end
 
 local function syncPassengers(dep)
-    local list = passengerIds(dep)
     for src, row in pairs(dep.players) do
         if row.state == 'PLANE' then
+            local list = passengerIds(dep, row.teamId)
             TriggerClientEvent('wtbg:drop:passengers', src, list)
         end
     end
@@ -188,12 +188,6 @@ local function releaseJump(dep, source, auto)
     setPlayer(dep, source, 'FREEFALL')
     syncPassengers(dep)
 
-    local ped = GetPlayerPed(source)
-    if ped and ped ~= 0 then
-        SetEntityCoords(ped, x, y, z, false, false, false, false)
-        SetEntityHeading(ped, h)
-    end
-
     TriggerClientEvent('wtbg:drop:jump', source, {
         matchId = dep.matchId,
         gen = dep.gen,
@@ -201,6 +195,8 @@ local function releaseJump(dep, source, auto)
         y = y,
         z = z,
         heading = h,
+        exitBack = back,
+        exitDown = down,
         auto = auto and true or false,
         forceHeight = tonumber(DropConfig.ForceParachuteHeight) or 92.0,
         groundDist = tonumber(DropConfig.GroundDetectionDistance) or 2.75
@@ -315,7 +311,12 @@ function WTBG.Drop.Prepare(matchId)
     for i = 1, #sources do
         local src = tonumber(sources[i])
         if src then
-            dep.players[src] = { state = 'PLANE', jumped = false }
+            local member = snap.players and (snap.players[src] or snap.players[tostring(src)])
+            dep.players[src] = {
+                state = 'PLANE',
+                jumped = false,
+                teamId = member and member.teamId or nil
+            }
             byPlayer[src] = { matchId = matchId, gen = gen }
         end
     end

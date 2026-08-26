@@ -13,15 +13,18 @@ DropConfig.ForceParachuteHeight = WTBG.Balance.Drop.ForceParachuteHeight
 DropConfig.GroundDetectionDistance = 2.75
 
 DropConfig.PlaneModel = 'titan'
-DropConfig.FlightPitch = -6.5
+DropConfig.PilotModel = 's_m_m_pilot_01'
+DropConfig.FlightPitch = -1.5
+DropConfig.CruiseTurbulence = 0.28
 DropConfig.JumpExitBack = 16.0
 DropConfig.JumpExitDown = 4.0
-DropConfig.MaxVisiblePassengers = 8
+DropConfig.MaxVisiblePassengers = 10
 
-DropConfig.CameraOffset = vector3(0.0, -28.0, 11.0)
+DropConfig.CameraOffset = vector3(0.0, -34.0, 14.0)
 DropConfig.CameraLook = vector3(0.0, 14.0, 1.5)
 DropConfig.CameraFov = 52.0
 DropConfig.CameraBlend = 350
+DropConfig.CameraSmoothing = 7.5
 
 DropConfig.SeatAnim = {
     dict = 'amb@code_human_in_bus_passenger_idles@male@sit@base',
@@ -37,7 +40,9 @@ DropConfig.PassengerOffsets = {
     { x = 1.08, y = -7.0, z = 1.42, h = 90.0 },
     { x = -1.08, y = -7.0, z = 1.42, h = -90.0 },
     { x = 1.08, y = -8.8, z = 1.42, h = 90.0 },
-    { x = -1.08, y = -8.8, z = 1.42, h = -90.0 }
+    { x = -1.08, y = -8.8, z = 1.42, h = -90.0 },
+    { x = 1.08, y = -10.6, z = 1.42, h = 90.0 },
+    { x = -1.08, y = -10.6, z = 1.42, h = -90.0 }
 }
 
 DropConfig.PlayableBounds = {

@@ -1,7 +1,7 @@
 local active = false
 local targetId = nil
 local cam = nil
-local missTicks = 0
+local missingSince = 0
 local lastSwitch = 0
 
 local BLOCK = {
@@ -66,7 +66,7 @@ end
 local function clearSpectator()
     active = false
     targetId = nil
-    missTicks = 0
+    missingSince = 0
     destroyCam()
     hideLocal(false)
     TriggerEvent('wtbg:ui:spectator', nil)
@@ -88,7 +88,7 @@ local function beginFollow(data, blend)
     end
     active = true
     targetId = tonumber(data.target)
-    missTicks = 0
+    missingSince = 0
     hideLocal(true)
     ensureCam()
     local ped = resolvePed(targetId)
@@ -114,10 +114,17 @@ RegisterNetEvent('wtbg:spec:update', function(data)
     end
     applyHud(data)
     if targetId == nextId then
+        ensureCam()
+        local currentPed = resolvePed(targetId)
+        if currentPed ~= 0 then
+            missingSince = 0
+            follow(currentPed)
+            RenderScriptCams(true, true, 120, true, true)
+        end
         return
     end
     targetId = nextId
-    missTicks = 0
+    missingSince = 0
     ensureCam()
     local ped = resolvePed(targetId)
     if ped ~= 0 then
@@ -181,23 +188,20 @@ CreateThread(function()
 
             local ped = resolvePed(targetId)
             if ped ~= 0 then
-                missTicks = 0
+                missingSince = 0
                 if not cam or not DoesCamExist(cam) then
                     ensureCam()
                     RenderScriptCams(true, false, 0, true, true)
                 end
                 follow(ped)
             else
-                missTicks = missTicks + 1
-                -- OneSync can briefly drop the target ped; wait before asking for another teammate.
-                if missTicks == 18 then
-                    local t = GetGameTimer()
-                    if t - lastSwitch > 2500 then
-                        lastSwitch = t
-                        TriggerServerEvent('wtbg:spec:next')
-                    else
-                        missTicks = 12
-                    end
+                local t = GetGameTimer()
+                if missingSince == 0 then
+                    missingSince = t
+                elseif t - missingSince >= 2500 and t - lastSwitch >= 2500 then
+                    lastSwitch = t
+                    missingSince = t
+                    TriggerServerEvent('wtbg:spec:next')
                 end
             end
             Wait(0)

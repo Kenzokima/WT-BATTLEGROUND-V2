@@ -62,6 +62,68 @@ function startHeal(label, ms) {
     }, 100);
 }
 
+const CUT = 'fill="rgba(0,0,0,.55)"';
+
+const WEAPON_SVG = {
+    carbine: `<polygon points="2,17 13,14.5 13,22 2,24"/><rect x="13" y="14.5" width="27" height="7.5" rx="1"/><rect x="19" y="10.5" width="17" height="3" rx="1"/><rect x="40" y="17" width="19" height="3"/><rect x="52" y="11.5" width="2" height="5.5"/><polygon points="24,22 32,22 33,32 26,32"/><polygon points="16.5,22 23,22 21,31 14.5,31"/><rect x="15" y="17.4" width="23" height="1.3" ${CUT}/><rect x="21" y="11.6" width="13" height="1" ${CUT}/>`,
+    ak: `<polygon points="2,18 15,15 15,22 2,25"/><rect x="15" y="14.5" width="23" height="7.5" rx="1"/><rect x="38" y="15.8" width="13" height="4.4" rx="1"/><rect x="51" y="17" width="9" height="2.2"/><rect x="44.5" y="10.5" width="3" height="6"/><path d="M23 22h9.5l3.5 7.5c.3 2-1.5 3.5-3.5 3.5h-6c-2 0-3.5-1.5-3.5-3.5z"/><polygon points="16.5,22 23,22 21,31 14.5,31"/><rect x="17" y="17.4" width="20" height="1.3" ${CUT}/><rect x="39" y="17.3" width="11" height="1.2" ${CUT}/>`,
+    smg: `<rect x="19" y="12.5" width="21" height="9.5" rx="1"/><rect x="40" y="16" width="10" height="3"/><rect x="26" y="22" width="6.5" height="11" rx="1"/><polygon points="18,22 24.5,22 22.5,31 16,31"/><rect x="7" y="15.8" width="12" height="3" rx="1"/><rect x="21" y="16.4" width="17" height="1.3" ${CUT}/><rect x="27.2" y="24" width="4" height="7" ${CUT}/>`,
+    microsmg: `<rect x="22" y="11.5" width="18" height="10.5" rx="1"/><rect x="40" y="15.8" width="6" height="3"/><rect x="26.5" y="22" width="6" height="9" rx="1"/><polygon points="20.5,22 26,22 24,30.5 18.5,30.5"/><rect x="24" y="8.5" width="10" height="3" rx="1"/><rect x="23.5" y="15.6" width="15" height="1.3" ${CUT}/>`,
+    shotgun: `<polygon points="2,18 15,15.5 15,22 2,25"/><rect x="15" y="15.5" width="21" height="6.5" rx="1"/><rect x="36" y="16.6" width="23" height="3"/><rect x="38" y="21" width="12" height="3" rx="1"/><polygon points="16.5,22 23,22 21,30.5 14.5,30.5"/><rect x="17" y="17.8" width="18" height="1.2" ${CUT}/><rect x="39" y="21.8" width="10" height="1.2" ${CUT}/>`,
+    pistol: `<rect x="24" y="12.5" width="22" height="5.5" rx="1"/><rect x="24" y="18" width="15" height="3.5"/><polygon points="26.5,21.5 35,21.5 32,32 23.5,32"/><rect x="45" y="16.5" width="4" height="2"/><rect x="26" y="17.6" width="18" height="1.2" ${CUT}/><path d="M29 21.5h6v3h-6z" ${CUT}/>`,
+    pistol2: `<rect x="23" y="11.5" width="24" height="6.5" rx="1"/><rect x="23" y="18" width="16" height="3.5"/><polygon points="25.5,21.5 35,21.5 32,32 22.5,32"/><rect x="29" y="8.5" width="13" height="2.5" rx="1"/><rect x="46" y="16.5" width="4" height="2"/><rect x="25" y="17.6" width="19" height="1.2" ${CUT}/><path d="M28 21.5h6.5v3H28z" ${CUT}/>`,
+    ammo: `<rect x="16" y="15" width="32" height="18" rx="2"/><rect x="23" y="6" width="5.5" height="9" rx="2.5"/><rect x="31.5" y="6" width="5.5" height="9" rx="2.5"/><rect x="16" y="19.5" width="32" height="1.6" ${CUT}/><rect x="30" y="21.1" width="4" height="11.9" ${CUT}/>`,
+    bandage: `<rect x="10" y="16.5" width="44" height="11" rx="5.5"/><rect x="25" y="14" width="7" height="16" transform="rotate(18 28.5 22)" ${CUT}/><rect x="36" y="14" width="7" height="16" transform="rotate(18 39.5 22)" ${CUT}/>`,
+    medkit: `<rect x="13" y="13" width="38" height="20" rx="3"/><rect x="26" y="8" width="12" height="5" rx="2"/><rect x="29.5" y="16.5" width="5" height="13" ${CUT}/><rect x="24.5" y="20.5" width="15" height="5" ${CUT}/>`,
+    armor: `<path d="M32 6 15 11.5v10.5c0 7.5 7.5 12.5 17 15.5 9.5-3 17-8 17-15.5V11.5z"/><rect x="30.5" y="12" width="3" height="24" ${CUT}/><rect x="19" y="19" width="26" height="2.4" ${CUT}/>`,
+    grenade: `<circle cx="32" cy="24.5" r="10.5"/><rect x="29" y="7" width="6" height="7.5" rx="2"/><rect x="34.5" y="8" width="8" height="3" rx="1.5"/><rect x="22" y="19.5" width="20" height="1.4" ${CUT}/><rect x="22" y="23.6" width="20" height="1.4" ${CUT}/><rect x="22" y="27.7" width="20" height="1.4" ${CUT}/>`,
+    molotov: `<path d="M27 13h10v5.5l4 7V36c0 1.5-1 2.5-2.5 2.5h-13C24 38.5 23 37.5 23 36V25.5l4-7z"/><rect x="27.5" y="5" width="9" height="8" rx="3.5"/><rect x="25" y="27" width="14" height="6" ${CUT}/>`,
+    smoke: `<rect x="24" y="10" width="16" height="25" rx="4"/><rect x="28" y="5" width="8" height="5" rx="2"/><rect x="27" y="16" width="10" height="1.8" ${CUT}/><rect x="27" y="21" width="10" height="1.8" ${CUT}/><rect x="27" y="26" width="10" height="1.8" ${CUT}/>`,
+    bag: `<path d="M26 15v-2.5a6 6 0 0 1 12 0V15" fill="none" stroke="currentColor" stroke-width="2.6"/><rect x="9" y="15" width="46" height="19" rx="5"/><rect x="9" y="22" width="46" height="2.2" ${CUT}/>`
+};
+
+const ITEM_META = {
+    rifle_carbine: { icon: 'carbine', rarity: 'epic', slot: 'primary' },
+    rifle_assault: { icon: 'ak', rarity: 'epic', slot: 'primary' },
+    smg_standard: { icon: 'smg', rarity: 'rare', slot: 'secondary' },
+    smg_micro: { icon: 'microsmg', rarity: 'uncommon', slot: 'secondary' },
+    shotgun_pump: { icon: 'shotgun', rarity: 'rare', slot: 'secondary' },
+    pistol_standard: { icon: 'pistol', rarity: 'common', slot: 'sidearm' },
+    pistol_combat: { icon: 'pistol2', rarity: 'uncommon', slot: 'sidearm' },
+    ammo_rifle: { icon: 'ammo', rarity: 'common' },
+    ammo_smg: { icon: 'ammo', rarity: 'common' },
+    ammo_shotgun: { icon: 'ammo', rarity: 'common' },
+    ammo_pistol: { icon: 'ammo', rarity: 'common' },
+    bandage: { icon: 'bandage', rarity: 'common' },
+    medkit: { icon: 'medkit', rarity: 'rare' },
+    armor_plate: { icon: 'armor', rarity: 'rare' },
+    grenade: { icon: 'grenade', rarity: 'uncommon' },
+    molotov: { icon: 'molotov', rarity: 'uncommon' },
+    smoke: { icon: 'smoke', rarity: 'common' }
+};
+
+const KIND_ICON = {
+    weapon: 'carbine',
+    ammo: 'ammo',
+    heal: 'medkit',
+    armor: 'armor',
+    throwable: 'grenade',
+    bag: 'bag'
+};
+
+const MAG_SIZE = { rifle: 30, smg: 30, shotgun: 8, pistol: 24 };
+
+function metaOf(itemId, kind) {
+    const meta = ITEM_META[itemId];
+    if (meta) return meta;
+    return { icon: KIND_ICON[kind] || 'ammo', rarity: 'common' };
+}
+
+function iconMarkup(name) {
+    const body = WEAPON_SVG[name] || WEAPON_SVG.ammo;
+    return `<svg viewBox="0 0 64 40" aria-hidden="true">${body}</svg>`;
+}
+
 function slotLabel(slot) {
     return slot && slot.label ? slot.label : 'Empty';
 }
@@ -71,44 +133,77 @@ function ammoFor(inv, type) {
     return inv.ammo[type] || 0;
 }
 
-function cardRow(row) {
-    const item = document.createElement('li');
-    if (row.rarity) {
-        item.classList.add(`rarity-${row.rarity}`);
+function tileEl(item) {
+    const li = document.createElement('li');
+    li.className = `tile rar-${item.rarity || 'common'}`;
+    const icon = document.createElement('div');
+    icon.className = 'tile-icon';
+    icon.innerHTML = iconMarkup(item.icon);
+    const meta = document.createElement('div');
+    meta.className = 'tile-meta';
+    const name = document.createElement('strong');
+    name.textContent = item.label;
+    meta.appendChild(name);
+    if (item.sub) {
+        const sub = document.createElement('span');
+        sub.textContent = item.sub;
+        meta.appendChild(sub);
     }
-    const name = document.createElement('span');
-    name.textContent = row.amount ? `${row.label}  x${row.amount}` : row.label;
-    item.appendChild(name);
-    (row.actions || []).forEach((act) => {
+    li.append(icon, meta);
+    if (item.amount > 1) {
+        const qty = document.createElement('b');
+        qty.className = 'tile-qty';
+        qty.textContent = `x${item.amount}`;
+        li.appendChild(qty);
+    }
+    const acts = document.createElement('div');
+    acts.className = 'tile-acts';
+    (item.actions || []).forEach((act) => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = act.label;
+        btn.addEventListener('mousedown', (event) => event.stopPropagation());
         btn.addEventListener('click', (event) => {
             event.stopPropagation();
             act.run();
         });
-        item.appendChild(btn);
+        acts.appendChild(btn);
     });
-    item.addEventListener('contextmenu', (event) => {
-        event.preventDefault();
-        const acts = row.actions || [];
-        if (acts.length) {
-            acts[0].run();
-        }
-    });
-    return item;
+    li.appendChild(acts);
+    bindTile(li, item);
+    return li;
 }
 
-function fillCards(el, rows) {
+function fillTiles(el, rows) {
     el.innerHTML = '';
     if (!rows.length) {
         const empty = document.createElement('li');
-        empty.className = 'empty';
+        empty.className = 'tile is-empty';
         empty.textContent = 'Empty';
         el.appendChild(empty);
         return;
     }
-    rows.forEach((row) => el.appendChild(cardRow(row)));
+    rows.forEach((row) => el.appendChild(tileEl(row)));
+}
+
+function setEquipSlot(key, slot, inv, fallbackAmmo) {
+    const label = document.getElementById(`inv-${key}`);
+    const ammoEl = document.getElementById(`eq-${key}-ammo`);
+    const iconEl = document.getElementById(`eq-${key}-icon`);
+    const wrap = document.getElementById(`eq-${key}`);
+    label.textContent = slotLabel(slot);
+    wrap.classList.toggle('is-filled', Boolean(slot));
+    if (!slot) {
+        ammoEl.textContent = '';
+        iconEl.innerHTML = '';
+        wrap.className = wrap.className.replace(/\brar-\w+/g, '').trim();
+        return;
+    }
+    const meta = metaOf(slot.id, 'weapon');
+    iconEl.innerHTML = iconMarkup(meta.icon);
+    ammoEl.textContent = `${ammoFor(inv, slot.ammoType || fallbackAmmo)} ROUNDS`;
+    wrap.className = wrap.className.replace(/\brar-\w+/g, '').trim();
+    wrap.classList.add(`rar-${meta.rarity}`);
 }
 
 function renderInventory(data) {
@@ -116,68 +211,90 @@ function renderInventory(data) {
     const ammoEl = document.getElementById('inv-ammo');
     const healEl = document.getElementById('inv-heal');
     const throwEl = document.getElementById('inv-throw');
+    const armorBar = document.getElementById('armor-bar');
+    const armor = Math.max(0, Math.min(100, Number(data && data.armor) || 0));
+    document.getElementById('inv-armor').textContent = `${armor} / 100`;
+    armorBar.style.width = `${armor}%`;
+    setEquipSlot('primary', data && data.primary, data, 'rifle');
+    setEquipSlot('secondary', data && data.secondary, data, 'smg');
+    setEquipSlot('sidearm', data && data.sidearm, data, 'pistol');
     if (!data) {
-        document.getElementById('inv-primary').textContent = 'Empty';
-        document.getElementById('inv-secondary').textContent = 'Empty';
-        document.getElementById('inv-sidearm').textContent = 'Empty';
-        document.getElementById('eq-primary-ammo').textContent = '';
-        document.getElementById('eq-secondary-ammo').textContent = '';
-        document.getElementById('eq-sidearm-ammo').textContent = '';
-        document.getElementById('inv-armor').textContent = '0 / 100';
-        fillCards(ammoEl, []);
-        fillCards(healEl, []);
-        fillCards(throwEl, []);
+        fillTiles(ammoEl, []);
+        fillTiles(healEl, []);
+        fillTiles(throwEl, []);
+        document.getElementById('bag-count').textContent = '0';
         return;
     }
-    document.getElementById('inv-primary').textContent = slotLabel(data.primary);
-    document.getElementById('inv-secondary').textContent = slotLabel(data.secondary);
-    document.getElementById('inv-sidearm').textContent = slotLabel(data.sidearm);
-    document.getElementById('eq-primary-ammo').textContent = data.primary ? String(ammoFor(data, data.primary.ammoType || 'rifle')) : '';
-    document.getElementById('eq-secondary-ammo').textContent = data.secondary ? String(ammoFor(data, data.secondary.ammoType || 'smg')) : '';
-    document.getElementById('eq-sidearm-ammo').textContent = data.sidearm ? String(ammoFor(data, data.sidearm.ammoType || 'pistol')) : '';
-    document.getElementById('inv-armor').textContent = `${data.armor ?? 0} / 100`;
+
     const ammo = data.ammo || {};
-    fillCards(ammoEl, [
-        { label: 'Rifle Ammo', key: 'rifle', amount: ammo.rifle || 0, dropAmount: Math.min(30, ammo.rifle || 0) },
-        { label: 'SMG Ammo', key: 'smg', amount: ammo.smg || 0, dropAmount: Math.min(30, ammo.smg || 0) },
-        { label: 'Shotgun Ammo', key: 'shotgun', amount: ammo.shotgun || 0, dropAmount: Math.min(8, ammo.shotgun || 0) },
-        { label: 'Pistol Ammo', key: 'pistol', amount: ammo.pistol || 0, dropAmount: Math.min(24, ammo.pistol || 0) }
-    ].filter((r) => r.amount > 0).map((r) => ({
-        ...r,
-        actions: [{ label: 'Drop', run: () => post('dropItem', { kind: 'ammo', key: r.key, amount: r.dropAmount || 1 }) }]
-    })));
+    const ammoRows = [
+        { key: 'rifle', itemId: 'ammo_rifle', label: 'Rifle Ammo' },
+        { key: 'smg', itemId: 'ammo_smg', label: 'SMG Ammo' },
+        { key: 'shotgun', itemId: 'ammo_shotgun', label: 'Shotgun Ammo' },
+        { key: 'pistol', itemId: 'ammo_pistol', label: 'Pistol Ammo' }
+    ].filter((r) => (ammo[r.key] || 0) > 0).map((r) => {
+        const total = ammo[r.key] || 0;
+        const mag = Math.min(MAG_SIZE[r.key] || 1, total);
+        const meta = metaOf(r.itemId, 'ammo');
+        return {
+            source: 'bag',
+            kind: 'ammo',
+            label: r.label,
+            sub: `MAG ${MAG_SIZE[r.key] || 1}`,
+            amount: total,
+            icon: meta.icon,
+            rarity: meta.rarity,
+            drop: (all) => post('dropItem', { kind: 'ammo', key: r.key, amount: all ? total : mag }),
+            actions: [{ label: 'Drop', run: () => post('dropItem', { kind: 'ammo', key: r.key, amount: mag }) }]
+        };
+    });
+    fillTiles(ammoEl, ammoRows);
+
     const healing = data.healing || {};
-    const healRows = [];
-    if (healing.bandage > 0) {
-        healRows.push({
-            label: 'Bandage',
-            amount: healing.bandage,
+    const healRows = [
+        { key: 'bandage', label: 'Bandage' },
+        { key: 'medkit', label: 'Medkit' }
+    ].filter((r) => (healing[r.key] || 0) > 0).map((r) => {
+        const total = healing[r.key] || 0;
+        const meta = metaOf(r.key, 'heal');
+        return {
+            source: 'bag',
+            kind: 'heal',
+            label: r.label,
+            amount: total,
+            icon: meta.icon,
+            rarity: meta.rarity,
+            use: () => post('useItem', { itemId: r.key }),
+            drop: (all) => post('dropItem', { kind: 'heal', key: r.key, amount: all ? total : 1 }),
             actions: [
-                { label: 'Use', run: () => post('useItem', { itemId: 'bandage' }) },
-                { label: 'Drop', run: () => post('dropItem', { kind: 'heal', key: 'bandage', amount: 1 }) }
+                { label: 'Use', run: () => post('useItem', { itemId: r.key }) },
+                { label: 'Drop', run: () => post('dropItem', { kind: 'heal', key: r.key, amount: 1 }) }
             ]
-        });
-    }
-    if (healing.medkit > 0) {
-        healRows.push({
-            label: 'Medkit',
-            amount: healing.medkit,
-            actions: [
-                { label: 'Use', run: () => post('useItem', { itemId: 'medkit' }) },
-                { label: 'Drop', run: () => post('dropItem', { kind: 'heal', key: 'medkit', amount: 1 }) }
-            ]
-        });
-    }
-    fillCards(healEl, healRows);
+        };
+    });
+    fillTiles(healEl, healRows);
+
     const throws = data.throwables || {};
-    fillCards(throwEl, [
-        { label: 'Grenade', key: 'grenade', amount: throws.grenade || 0 },
-        { label: 'Molotov', key: 'molotov', amount: throws.molotov || 0 },
-        { label: 'Smoke', key: 'smoke', amount: throws.smoke || 0 }
-    ].filter((r) => r.amount > 0).map((r) => ({
-        ...r,
-        actions: [{ label: 'Drop', run: () => post('dropItem', { kind: 'throwable', key: r.key, amount: 1 }) }]
-    })));
+    const throwRows = [
+        { key: 'grenade', label: 'Grenade' },
+        { key: 'molotov', label: 'Molotov' },
+        { key: 'smoke', label: 'Smoke' }
+    ].filter((r) => (throws[r.key] || 0) > 0).map((r) => {
+        const total = throws[r.key] || 0;
+        const meta = metaOf(r.key, 'throwable');
+        return {
+            source: 'bag',
+            kind: 'throwable',
+            label: r.label,
+            amount: total,
+            icon: meta.icon,
+            rarity: meta.rarity,
+            drop: (all) => post('dropItem', { kind: 'throwable', key: r.key, amount: all ? total : 1 }),
+            actions: [{ label: 'Drop', run: () => post('dropItem', { kind: 'throwable', key: r.key, amount: 1 }) }]
+        };
+    });
+    fillTiles(throwEl, throwRows);
+    document.getElementById('bag-count').textContent = String(ammoRows.length + healRows.length + throwRows.length);
 }
 
 function renderVicinity(list, bag) {
@@ -191,10 +308,16 @@ function renderVicinity(list, bag) {
         sub.textContent = 'LOOT BAG';
         show(sub, true);
         bag.contents.forEach((row) => {
+            const meta = metaOf(row.itemId, row.kind);
             rows.push({
+                source: 'ground',
+                kind: row.kind,
+                slot: meta.slot,
                 label: row.label,
                 amount: row.amount,
-                rarity: row.rarity,
+                icon: meta.icon,
+                rarity: meta.rarity,
+                take: () => post('bagTake', { lootId: bag.id, uid: row.uid }),
                 actions: [{ label: 'Take', run: () => post('bagTake', { lootId: bag.id, uid: row.uid }) }]
             });
         });
@@ -205,18 +328,181 @@ function renderVicinity(list, bag) {
         if (bag && row.id === bag.id) {
             return;
         }
+        const kind = row.bag ? 'bag' : row.kind;
+        const meta = row.bag ? { icon: 'bag', rarity: 'rare' } : metaOf(row.itemId, kind);
         rows.push({
+            source: 'ground',
+            kind: kind,
+            slot: meta.slot,
             label: row.label,
             amount: row.amount,
-            rarity: row.rarity,
+            icon: meta.icon,
+            rarity: meta.rarity,
+            take: () => post('pickupLoot', { lootId: row.id }),
             actions: [{
-                label: row.bag ? 'Open' : 'Pick Up',
+                label: row.bag ? 'Open' : 'Take',
                 run: () => post('pickupLoot', { lootId: row.id })
             }]
         });
     });
-    fillCards(el, rows);
+    fillTiles(el, rows);
+    document.getElementById('vicinity-count').textContent = String(rows.length);
 }
+
+const ghostEl = document.getElementById('drag-ghost');
+let press = null;
+let dragItem = null;
+let hoverZone = null;
+let suppressClick = false;
+
+function zoneList() {
+    return Array.prototype.slice.call(document.querySelectorAll('#inventory [data-zone]'));
+}
+
+function zoneAccepts(item, zone) {
+    const kind = zone.dataset.zone;
+    if (item.source === 'ground') {
+        if (kind === 'bag') return Boolean(item.take);
+        if (kind === 'equip') {
+            return Boolean(item.take) && item.kind === 'weapon' && zone.dataset.slot === item.slot;
+        }
+        return false;
+    }
+    return kind === 'ground' && Boolean(item.drop);
+}
+
+function clearZones() {
+    zoneList().forEach((zone) => zone.classList.remove('zone-ok', 'zone-hot'));
+    hoverZone = null;
+}
+
+function endDrag() {
+    if (dragItem && dragItem.el) {
+        dragItem.el.classList.remove('is-dragged');
+    }
+    dragItem = null;
+    press = null;
+    clearZones();
+    show(ghostEl, false);
+    ghostEl.innerHTML = '';
+    document.body.classList.remove('is-dragging');
+}
+
+function moveGhost(event) {
+    ghostEl.style.left = `${event.clientX}px`;
+    ghostEl.style.top = `${event.clientY}px`;
+}
+
+function startDrag(item, el, event) {
+    dragItem = { item, el };
+    el.classList.add('is-dragged');
+    document.body.classList.add('is-dragging');
+    ghostEl.className = `drag-ghost rar-${item.rarity || 'common'}`;
+    ghostEl.innerHTML = `<div class="tile-icon">${iconMarkup(item.icon)}</div><strong>${item.label}</strong>`;
+    moveGhost(event);
+    zoneList().forEach((zone) => {
+        if (zoneAccepts(item, zone)) {
+            zone.classList.add('zone-ok');
+        }
+    });
+}
+
+function bindTile(el, item) {
+    if (!item.take && !item.drop && !item.use) {
+        return;
+    }
+    el.classList.add('can-drag');
+    el.addEventListener('mousedown', (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        press = { item, el, x: event.clientX, y: event.clientY };
+    });
+    el.addEventListener('click', () => {
+        if (suppressClick) return;
+        if (item.use) {
+            item.use();
+        } else if (item.take) {
+            item.take();
+        }
+    });
+    el.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        if (item.drop) {
+            item.drop(event.shiftKey);
+        } else if (item.take) {
+            item.take();
+        }
+    });
+}
+
+function equipItem(slotKey) {
+    const slot = lastInv && lastInv[slotKey];
+    if (!slot) return null;
+    const meta = metaOf(slot.id, 'weapon');
+    return {
+        source: 'equip',
+        kind: 'weapon',
+        slot: slotKey,
+        label: slot.label,
+        icon: meta.icon,
+        rarity: meta.rarity,
+        drop: () => post('dropItem', { kind: 'weapon', key: slotKey, amount: 1 })
+    };
+}
+
+['primary', 'secondary', 'sidearm'].forEach((slotKey) => {
+    const el = document.getElementById(`eq-${slotKey}`);
+    el.addEventListener('mousedown', (event) => {
+        if (event.button !== 0) return;
+        const item = equipItem(slotKey);
+        if (!item) return;
+        event.preventDefault();
+        press = { item, el, x: event.clientX, y: event.clientY };
+    });
+    el.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        const item = equipItem(slotKey);
+        if (item) {
+            item.drop();
+        }
+    });
+});
+
+document.addEventListener('mousemove', (event) => {
+    if (!dragItem && press) {
+        if (Math.abs(event.clientX - press.x) + Math.abs(event.clientY - press.y) < 6) {
+            return;
+        }
+        startDrag(press.item, press.el, event);
+    }
+    if (!dragItem) return;
+    moveGhost(event);
+    const under = document.elementFromPoint(event.clientX, event.clientY);
+    const zone = under && under.closest ? under.closest('#inventory [data-zone]') : null;
+    const next = zone && zoneAccepts(dragItem.item, zone) ? zone : null;
+    if (next === hoverZone) return;
+    if (hoverZone) hoverZone.classList.remove('zone-hot');
+    hoverZone = next;
+    if (hoverZone) hoverZone.classList.add('zone-hot');
+});
+
+document.addEventListener('mouseup', (event) => {
+    if (!dragItem) {
+        press = null;
+        return;
+    }
+    const item = dragItem.item;
+    const zone = hoverZone;
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 0);
+    endDrag();
+    if (!zone) return;
+    if (zone.dataset.zone === 'ground') {
+        if (item.drop) item.drop(event.shiftKey);
+    } else if (item.take) {
+        item.take();
+    }
+});
 
 function stopBleed() {
     if (bleedTimer) {
@@ -517,7 +803,7 @@ function addKill(killer, victim, kind, ms) {
 
 function fillSlots(listEl, members, maxSize, numbered) {
     listEl.innerHTML = '';
-    const size = maxSize || 4;
+    const size = maxSize || 10;
     for (let i = 0; i < size; i += 1) {
         const member = members && members[i];
         const row = document.createElement('li');
@@ -562,7 +848,7 @@ function fillSlots(listEl, members, maxSize, numbered) {
 }
 
 function renderParty(party) {
-    const maxSize = (party && party.maxSize) || 4;
+    const maxSize = (party && party.maxSize) || 10;
     document.getElementById('party-size').textContent = party
         ? `${party.size} / ${maxSize}`
         : `0 / ${maxSize}`;
@@ -583,7 +869,7 @@ function renderSquad(squad) {
         downed: m.downed,
         drop: dropMembers[m.source],
         leader: false
-    })), Math.max(4, squad.length), true);
+    })), Math.max(10, squad.length), true);
 }
 
 function formatClock(seconds) {
@@ -706,6 +992,7 @@ window.addEventListener('message', (event) => {
             stopBleed();
             setPrompt(null);
             stopHeal();
+            endDrag();
             show(inventory, false);
             renderVicinity([], null);
             setContext(null);
@@ -745,6 +1032,7 @@ window.addEventListener('message', (event) => {
             stopBleed();
             setPrompt(null);
             stopHeal();
+            endDrag();
             show(inventory, false);
             renderVicinity([], null);
             setContext(null);
@@ -783,6 +1071,7 @@ window.addEventListener('message', (event) => {
             stopBleed();
             setPrompt(null);
             stopHeal();
+            endDrag();
             show(inventory, false);
             renderVicinity([], null);
             setContext(null);
@@ -826,6 +1115,9 @@ window.addEventListener('message', (event) => {
             renderInventory(data.inventory || null);
             break;
         case 'inventoryOpen':
+            if (!data.open) {
+                endDrag();
+            }
             show(inventory, Boolean(data.open));
             app.classList.toggle('focus', !inventory.classList.contains('hidden') || !menu.classList.contains('hidden') || !invite.classList.contains('hidden'));
             break;
@@ -900,13 +1192,25 @@ document.getElementById('btn-decline').addEventListener('click', () => {
 });
 
 document.querySelectorAll('.eq-drop').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('mousedown', (event) => event.stopPropagation());
+    btn.addEventListener('click', (event) => {
+        event.stopPropagation();
         post('dropItem', { kind: btn.dataset.kind, key: btn.dataset.key, amount: 1 });
     });
 });
 
+document.getElementById('inv-close').addEventListener('click', () => {
+    show(inventory, false);
+    post('closeInventory');
+});
+
 document.addEventListener('keydown', (event) => {
     const invVisible = !inventory.classList.contains('hidden');
+    if (dragItem && event.key === 'Escape') {
+        event.preventDefault();
+        endDrag();
+        return;
+    }
     if (invVisible && (event.key === 'Tab' || event.key === 'F2' || event.key === 'Escape')) {
         event.preventDefault();
         show(inventory, false);

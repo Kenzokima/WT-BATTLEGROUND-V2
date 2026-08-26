@@ -19,6 +19,7 @@ Config.MatchSpawnPoints = {
 
 Config.MinPlayers = 2
 Config.MaxPlayers = 16
+Config.AllowSoloTest = true
 
 Config.Loadout = {
     { weapon = 'WEAPON_CARBINERIFLE', ammo = 180 },
@@ -31,8 +32,8 @@ Config.DevAce = 'wtbg.dev'
 
 Config.PedModel = 'mp_m_freemode_01'
 
-Config.PartyMaxSize = 4
+Config.PartyMaxSize = 10
 Config.PartyInviteTimeout = 30
-Config.SquadSize = 4
+Config.SquadSize = 10
 Config.FriendlyFire = false
 Config.MatchMode = 'SQUAD'

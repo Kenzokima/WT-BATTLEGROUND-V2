@@ -35,7 +35,6 @@ local function publicLoot(entry)
         bag = entry.bag and true or false,
         label = entry.bag and 'Loot Bag' or LootItemLabel(entry.itemId),
         model = entry.bag and 'prop_cs_heist_bag_01' or ((def and def.model) or 'prop_cs_cardbox_01'),
-        rarity = def and def.rarity or nil,
         kind = def and def.type or (entry.bag and 'bag' or nil),
         ammoType = def and def.ammoType or nil,
         x = entry.x,
@@ -52,7 +51,6 @@ local function publicLoot(entry)
                 itemId = row.itemId,
                 amount = row.amount,
                 label = LootItemLabel(row.itemId),
-                rarity = LootItems[row.itemId] and LootItems[row.itemId].rarity or nil,
                 kind = LootItems[row.itemId] and LootItems[row.itemId].type or nil
             }
         end
@@ -179,25 +177,36 @@ local function weightedKey(weights)
     local acc = 0
     for key, w in pairs(weights) do
         acc = acc + (tonumber(w) or 0)
-        if roll <= acc then
+        if roll < acc then
             return key
         end
     end
     return nil
 end
 
-local function rollItem(pool, rarity)
+local function rollItem(pool, tier)
     local ids = LootPools[pool]
     if not ids or #ids == 0 then
         return nil
     end
-    rarity = rarity or (LootConfig.TierRarity and LootConfig.TierRarity.medium) or {}
+    if tier ~= 'high' and tier ~= 'low' then
+        tier = 'medium'
+    end
 
     local total = 0
     local weights = {}
     for i = 1, #ids do
         local def = LootItems[ids[i]]
-        local w = (def and def.spawnWeight) or (def and rarity[def.rarity]) or 1
+        local configured = def and def.spawnWeight
+        local w
+        if type(configured) == 'table' then
+            w = tonumber(configured[tier]) or 0
+        else
+            w = tonumber(configured) or 1
+        end
+        if w < 0 then
+            w = 0
+        end
         weights[i] = w
         total = total + w
     end
@@ -208,11 +217,61 @@ local function rollItem(pool, rarity)
     local acc = 0
     for i = 1, #ids do
         acc = acc + weights[i]
-        if roll <= acc then
+        if roll < acc then
             return ids[i]
         end
     end
     return ids[#ids]
+end
+
+local function scatterZone(zone)
+    local points = {}
+    local radius = tonumber(zone.radius) or 80.0
+    local spacing = tonumber(LootConfig.MinSpacing) or 14.0
+    local minSq = spacing * spacing
+    local counts = LootConfig.ZoneCounts or {}
+    local n = tonumber(zone.count) or counts[zone.tier] or 12
+    n = math.floor(n)
+    if n < 1 then
+        return points
+    end
+
+    local tries = 0
+    local cap = n * 14
+    while #points < n and tries < cap do
+        tries = tries + 1
+        local ang = math.random() * 6.283185307179586
+        local rad = math.sqrt(math.random()) * radius
+        local x = zone.x + math.cos(ang) * rad
+        local y = zone.y + math.sin(ang) * rad
+        local ok = true
+        for i = 1, #points do
+            local dx = points[i].x - x
+            local dy = points[i].y - y
+            if dx * dx + dy * dy < minSq then
+                ok = false
+                break
+            end
+        end
+        if ok then
+            points[#points + 1] = {
+                x = x,
+                y = y,
+                z = zone.z,
+                tier = zone.tier
+            }
+        end
+    end
+
+    local guarantees = LootConfig.TierGuarantees and LootConfig.TierGuarantees[zone.tier]
+    if type(guarantees) == 'table' then
+        for i = 1, math.min(#points, #guarantees) do
+            if LootItems[guarantees[i]] then
+                points[i].itemId = guarantees[i]
+            end
+        end
+    end
+    return points
 end
 
 function LootWorld.Ensure(matchId, bucket)
@@ -244,27 +303,43 @@ function LootWorld.Generate(matchId, bucket)
         pistol = 'ammo_pistol'
     }
 
-    local points = LootConfig.SpawnPoints
+    local zones = LootConfig.Zones
+    local points = {}
+    if type(zones) == 'table' then
+        for i = 1, #zones do
+            local scattered = scatterZone(zones[i])
+            for j = 1, #scattered do
+                points[#points + 1] = scattered[j]
+            end
+        end
+    end
+    if #points == 0 then
+        points = LootConfig.SpawnPoints or {}
+    end
     for i = 1, #points do
         local pt = points[i]
         local tier = pt.tier
         if tier ~= 'high' and tier ~= 'low' then
             tier = 'medium'
         end
-        local cats = LootConfig.TierWeights[tier] or LootConfig.TierWeights.medium
-        local rarity = LootConfig.TierRarity[tier] or LootConfig.TierRarity.medium
-        local cat = weightedKey(cats)
-        if cat and cat ~= 'empty' then
-            local itemId = rollItem(cat, rarity)
-            local def = itemId and LootItems[itemId]
-            if def then
-                spawnEntry(matchId, bucket, itemId, def.amount or 1, pt.x, pt.y, pt.z, nil)
-                if def.type == 'weapon' then
-                    local ammoId = ammoFor[def.ammoType]
-                    local ammoDef = ammoId and LootItems[ammoId]
-                    if ammoDef then
-                        spawnEntry(matchId, bucket, ammoId, ammoDef.amount or 1, pt.x + 1.35, pt.y + 0.9, pt.z, nil)
-                    end
+        local itemId = pt.itemId
+        if not LootItems[itemId] then
+            local cats = LootConfig.TierWeights[tier] or LootConfig.TierWeights.medium
+            local cat = weightedKey(cats)
+            if cat and cat ~= 'empty' then
+                itemId = rollItem(cat, tier)
+            else
+                itemId = nil
+            end
+        end
+        local def = itemId and LootItems[itemId]
+        if def then
+            spawnEntry(matchId, bucket, itemId, def.amount or 1, pt.x, pt.y, pt.z, nil)
+            if def.type == 'weapon' then
+                local ammoId = ammoFor[def.ammoType]
+                local ammoDef = ammoId and LootItems[ammoId]
+                if ammoDef then
+                    spawnEntry(matchId, bucket, ammoId, ammoDef.amount or 1, pt.x + 1.35, pt.y + 0.9, pt.z, nil)
                 end
             end
         end
