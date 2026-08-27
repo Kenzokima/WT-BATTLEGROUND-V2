@@ -599,19 +599,6 @@ function updateVitals(data) {
     setBar('armor', data.armor, data.maxArmor);
 }
 
-function placeVitals(anchor) {
-    // anchor: nilai 0..1 dari client (posisi & ukuran minimap)
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const mapWidth = anchor.width * w;
-    const gap = Math.max(6, mapWidth * 0.03);
-
-    vitals.style.left = `${anchor.leftX * w}px`;
-    vitals.style.width = `${mapWidth}px`;
-    vitals.style.bottom = `${h - anchor.topY * h + gap}px`;
-    vitals.style.setProperty('--vscale', String(Math.max(0.75, mapWidth / 270)));
-}
-
 let profileOpen = false;
 let lastProfile = null;
 let historyTab = 'overview';
@@ -1035,9 +1022,6 @@ window.addEventListener('message', (event) => {
             break;
         case 'vitals':
             updateVitals(data);
-            break;
-        case 'vitalsAnchor':
-            placeVitals(data);
             break;
         case 'menu':
             setMenu(Boolean(data.open));
