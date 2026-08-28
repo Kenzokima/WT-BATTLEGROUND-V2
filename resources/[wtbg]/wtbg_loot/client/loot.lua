@@ -1,4 +1,4 @@
-local loot = {}
+wlocal loot = {}
 local objects = {}
 local inMatch = false
 local nearest = nil
