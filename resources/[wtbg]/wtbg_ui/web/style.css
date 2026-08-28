@@ -8,6 +8,8 @@
     --danger: #c45a4a;
     --dead: #5c6166;
     --shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+    /* ruang yang dipakai vitals di bawah-tengah; dipakai elemen center-bottom lain */
+    --vitals-space: clamp(46px, 6.5vh, 62px);
     font-size: 16px;
 }
 
@@ -431,7 +433,7 @@ body {
 
 #toasts {
     position: absolute;
-    bottom: clamp(18px, 4vh, 48px);
+    bottom: calc(clamp(18px, 4vh, 48px) + var(--vitals-space));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -456,23 +458,22 @@ body {
 }
 
 #vitals {
-    /* posisi & lebar diset dari JS mengikuti anchor minimap */
-    --vscale: 1;
     position: absolute;
-    left: 16px;
-    bottom: 16px;
-    width: 270px;
+    left: 50%;
+    bottom: clamp(12px, 2.2vh, 26px);
+    transform: translateX(-50%);
+    width: min(340px, 30vw);
     display: flex;
     flex-direction: column;
-    gap: calc(3px * var(--vscale));
+    gap: 3px;
     pointer-events: none;
 }
 
 .vital-row {
     display: grid;
-    grid-template-columns: calc(20px * var(--vscale)) 1fr;
+    grid-template-columns: 18px 1fr;
     align-items: center;
-    gap: calc(6px * var(--vscale));
+    gap: 6px;
 }
 
 .vital-row.is-empty {
@@ -480,8 +481,8 @@ body {
 }
 
 .vital-icon {
-    width: calc(16px * var(--vscale));
-    height: calc(16px * var(--vscale));
+    width: 15px;
+    height: 15px;
     justify-self: center;
     color: #fff;
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.65));
@@ -495,14 +496,14 @@ body {
 
 .vital-bar {
     position: relative;
-    height: calc(16px * var(--vscale));
+    height: 14px;
     border-radius: 2px;
     overflow: hidden;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
 .vital-bar.health {
-    height: calc(20px * var(--vscale));
+    height: 18px;
 }
 
 .vital-bar.armor { background: rgba(8, 16, 32, 0.72); }
@@ -524,9 +525,9 @@ body {
     display: flex;
     align-items: center;
     height: 100%;
-    padding-left: calc(8px * var(--vscale));
+    padding-left: 8px;
     font-family: "Arial Black", "Arial Bold", Arial, sans-serif;
-    font-size: calc(11px * var(--vscale));
+    font-size: 11px;
     font-weight: 900;
     letter-spacing: 0.04em;
     color: #fff;
@@ -751,7 +752,7 @@ body {
 .downed {
     position: absolute;
     left: 50%;
-    bottom: clamp(78px, 13vh, 130px);
+    bottom: calc(clamp(78px, 13vh, 130px) + var(--vitals-space));
     transform: translateX(-50%);
     text-align: center;
     pointer-events: none;
@@ -783,7 +784,7 @@ body {
 .prompt {
     position: absolute;
     left: 50%;
-    bottom: clamp(28px, 6vh, 56px);
+    bottom: calc(clamp(28px, 6vh, 56px) + var(--vitals-space));
     transform: translateX(-50%);
     width: min(240px, 70vw);
     text-align: center;
@@ -809,7 +810,7 @@ body {
 .heal {
     position: absolute;
     left: 50%;
-    bottom: clamp(88px, 14vh, 140px);
+    bottom: calc(clamp(88px, 14vh, 140px) + var(--vitals-space));
     transform: translateX(-50%);
     width: min(220px, 64vw);
     text-align: center;
@@ -1309,7 +1310,7 @@ body.is-dragging .zone-hot .zone-tag {
 .context {
     position: absolute;
     left: 50%;
-    bottom: clamp(96px, 16vh, 160px);
+    bottom: calc(clamp(96px, 16vh, 160px) + var(--vitals-space));
     transform: translateX(-50%);
     display: flex;
     align-items: center;
@@ -1427,7 +1428,7 @@ body.is-dragging .zone-hot .zone-tag {
 .drop-hud {
     position: absolute;
     left: 50%;
-    bottom: clamp(88px, 14vh, 140px);
+    bottom: calc(clamp(88px, 14vh, 140px) + var(--vitals-space));
     transform: translateX(-50%);
     text-align: center;
     pointer-events: none;

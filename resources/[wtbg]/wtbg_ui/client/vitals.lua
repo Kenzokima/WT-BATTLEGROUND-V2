@@ -1,44 +1,55 @@
--- Custom vitals HUD (armor / health) menggantikan bar native di bawah minimap.
+-- Custom vitals HUD (armor / health) di bawah-tengah layar.
 
--- Posisi & ukuran minimap dalam koordinat layar 0..1 (memperhitungkan safezone & aspect ratio).
-local function getMinimapAnchor()
-    local safezone = GetSafeZoneSize()
-    local aspectRatio = GetAspectRatio(0)
-    local resX, resY = GetActiveScreenResolution()
-    local xScale = 1.0 / resX
-    local yScale = 1.0 / resY
+local HEALTH_ARMOUR_HIDDEN = 3
 
-    local width = xScale * (resX / (4 * aspectRatio))
-    local height = yScale * (resY / 5.674)
-    local leftX = xScale * (resX * (0.05 * (math.abs(safezone - 1.0) * 10)))
-    local bottomY = 1.0 - yScale * (resY * (0.05 * (math.abs(safezone - 1.0) * 10)))
+local minimapScaleform = nil
 
-    return {
-        leftX = leftX,
-        topY = bottomY - height,
-        width = width,
-        height = height
-    }
-end
-
--- Sembunyikan health/armor bar native yang menempel di minimap.
-local function hideNativeHealthBar()
-    local minimap = RequestScaleformMovie('minimap')
-    if HasScaleformMovieLoaded(minimap) then
-        BeginScaleformMovieMethod(minimap, 'SETUP_HEALTH_ARMOUR')
-        ScaleformMovieMethodAddParamInt(3)
-        EndScaleformMovieMethod()
+local function ensureMinimapScaleform()
+    if minimapScaleform and HasScaleformMovieLoaded(minimapScaleform) then
+        return minimapScaleform
     end
+
+    local handle = RequestScaleformMovie('minimap')
+    local deadline = GetGameTimer() + 5000
+    while not HasScaleformMovieLoaded(handle) and GetGameTimer() < deadline do
+        Wait(50)
+    end
+
+    if not HasScaleformMovieLoaded(handle) then
+        return nil
+    end
+
+    minimapScaleform = handle
+    return handle
 end
 
+-- Bar health/armor native menempel di scaleform minimap. Handle-nya harus dipakai
+-- ulang: request berulang-ulang bikin minimap ikut hilang.
+local function hideNativeVitalBars()
+    local handle = ensureMinimapScaleform()
+    if not handle then
+        return
+    end
+
+    BeginScaleformMovieMethod(handle, 'SETUP_HEALTH_ARMOUR')
+    ScaleformMovieMethodAddParamInt(HEALTH_ARMOUR_HIDDEN)
+    EndScaleformMovieMethod()
+end
+
+-- Ped baru (spawn / respawn) mereset state minimap, jadi hide-nya diulang di situ saja.
 CreateThread(function()
+    local lastPed = nil
     while true do
-        hideNativeHealthBar()
-        Wait(5000)
+        local ped = PlayerPedId()
+        if ped ~= lastPed then
+            lastPed = ped
+            DisplayRadar(true)
+            hideNativeVitalBars()
+        end
+        Wait(1000)
     end
 end)
 
--- Kirim nilai vitals ke NUI.
 CreateThread(function()
     while true do
         local ped = PlayerPedId()
@@ -58,27 +69,5 @@ CreateThread(function()
         })
 
         Wait(200)
-    end
-end)
-
--- Kirim anchor minimap ke NUI (hanya saat berubah).
-CreateThread(function()
-    local last = nil
-    while true do
-        local anchor = getMinimapAnchor()
-        if not last
-            or math.abs(anchor.leftX - last.leftX) > 0.0005
-            or math.abs(anchor.topY - last.topY) > 0.0005
-            or math.abs(anchor.width - last.width) > 0.0005 then
-            last = anchor
-            SendNUIMessage({
-                action = 'vitalsAnchor',
-                leftX = anchor.leftX,
-                topY = anchor.topY,
-                width = anchor.width,
-                height = anchor.height
-            })
-        end
-        Wait(1000)
     end
 end)
